@@ -1,6 +1,6 @@
 // Core battle rules — symmetric lane battler. Both sides play cards from their own decks;
 // cards are staged during the turn and revealed at end of turn (the side winning more lanes reveals first).
-// Energy equals the turn number. Start with 3 cards, draw 1 per turn, hand limit 7.
+// Energy equals the turn number. Both sides get a fresh five-card draw each turn.
 // DOM-free so it can run in Node for simulation tests.
 import { CARDS, TOKENS, cardDef } from '../data/cards.js';
 import { GEMS } from '../data/gems.js';
@@ -11,7 +11,7 @@ import { OPPONENTS, BOSSES } from '../data/enemies.js';
 import { WARDENS } from '../data/wardens.js';
 import { makeRng } from '../core/rng.js';
 
-export const START_HAND = 3;
+export const DRAW_PER_TURN = 5;
 export const MAX_HAND = 7;
 export const BASE_CAP = 4;
 const PLAYER = 0, ENEMY = 1;
@@ -20,7 +20,7 @@ let BID = 1;
 
 function sideState() {
   return {
-    hand: [], deck: [], discard: [], energy: 0, energyNext: 0, bank: 0, nextCostReduction: 0,
+    hand: [], deck: [], discard: [], nextHand: [], drawNext: 0, energy: 0, energyNext: 0, bank: 0, nextCostReduction: 0,
     playedAll: [], playedThisTurn: [], staged: [], destroyedCount: 0, discardedCount: 0, strikeBonus: 0,
     movesThisTurn: 0, cardsPlayedTotal: 0,
   };
@@ -110,7 +110,11 @@ export class Battle {
 
   makeHandCard(inst, defOverride, side = this.me) {
     const def = defOverride || cardDef(inst.id);
-    return { hid: BID++, inst, def, side, costMod: 0, age: 0 };
+    return { hid: BID++, inst, def, side, costMod: 0 };
+  }
+
+  handPower(hc) {
+    return this.basePowerOf(hc.def, hc.inst) + (hc.extra || 0) + (hc.def.handPower?.(this) || 0);
   }
 
   gems(inst) { return (inst?.sockets || []).filter(Boolean).map((g) => GEMS[g]).filter(Boolean); }
@@ -214,13 +218,6 @@ export class Battle {
   // ---------- turn flow ----------
   start() {
     for (const side of [PLAYER, ENEMY]) this.emitFor(side, 'battleStart');
-    let pStart = START_HAND, eStart = START_HAND;
-    for (const r of this.relics) pStart += r.startCards || 0;
-    pStart += this.warden?.startCards || 0;
-    for (const r of this.relics) eStart -= r.enemyStartMinus || 0;
-    eStart += this.enc.enemyStartBonus || 0;
-    this.as(PLAYER, () => this.drawCards(pStart));
-    this.as(ENEMY, () => this.drawCards(eStart));
     this.beginTurn();
   }
 
@@ -231,9 +228,14 @@ export class Battle {
       S.playedThisTurn = []; S.staged = []; S.movesThisTurn = 0;
       S.energy = this.turn + S.energyNext + S.bank;
       S.energyNext = 0; S.bank = 0;
-      for (const hc of S.hand) hc.age++;
-      let n = 1;
-      if (side === PLAYER) for (const r of this.relics) n += r.drawBonus || 0;
+      S.hand = S.nextHand.splice(0);
+      let n = DRAW_PER_TURN + S.drawNext;
+      S.drawNext = 0;
+      if (side === PLAYER) for (const r of this.relics) n += (r.drawBonus || 0) + (this.turn === 1 ? r.startCards || 0 : 0);
+      if (this.turn === 1) {
+        if (side === PLAYER) n += this.warden?.startCards || 0;
+        else n += (this.enc.enemyStartBonus || 0) - this.relics.reduce((sum, r) => sum + (r.enemyStartMinus || 0), 0);
+      }
       this.as(side, () => this.drawCards(n));
     }
     for (const lane of this.lanes) { lane.playedHere = [0, 0]; lane.revealedHere = [0, 0]; }
@@ -245,9 +247,14 @@ export class Battle {
 
   drawCards(n) {
     const S = this.side;
-    for (let i = 0; i < n; i++) {
-      if (S.hand.length >= MAX_HAND || !S.deck.length) break;
-      const hc = S.deck.pop(); hc.costMod = 0; hc.age = 0; hc.side = this.me;
+    for (let i = 0; i < n && S.hand.length < MAX_HAND; i++) {
+      if (!S.deck.length) {
+        if (!S.discard.length) break;
+        S.deck = this.rng.shuffle(S.discard.splice(0));
+      }
+      const hc = S.deck.pop();
+      hc.costMod = 0;
+      hc.extra = 0;
       S.hand.push(hc);
     }
   }
@@ -276,9 +283,10 @@ export class Battle {
       const hc = this.hand.find((h) => h.hid === hid);
       this.hand = this.hand.filter((h) => h !== hc);
       this.energy -= chk.cost;
-      this.nextCostReduction = 0;
       const bc = this.place(hc.def, hc.inst, laneIdx, { hc, staged: true });
       if (!bc) return { ok: false };
+      bc.usedDiscount = this.nextCostReduction;
+      this.nextCostReduction = 0;
       bc.paid = chk.cost; bc.hc = hc;
       this.side.staged.push(bc);
       this.side.playedThisTurn.push(bc);
@@ -300,6 +308,7 @@ export class Battle {
     S.playedThisTurn = S.playedThisTurn.filter((c) => c !== bc);
     S.cardsPlayedTotal--;
     S.energy += bc.paid;
+    S.nextCostReduction += bc.usedDiscount;
     bc.gone = true;
     S.hand.push(bc.hc);
     this.push({ t: 'unstage', bid });
@@ -341,12 +350,11 @@ export class Battle {
     const slot = lane.slotsBy[side].findIndex((s) => !s);
     if (slot < 0) return null;
     const bc = {
-      bid: BID++, def, inst, side, lane: laneIdx, slot, base: this.basePowerOf(def, inst), buff: 0, aura: 0,
+      bid: BID++, def, inst, side, lane: laneIdx, slot,
+      base: opts.hc ? this.handPower(opts.hc) : this.basePowerOf(def, inst), buff: 0, aura: 0,
       turnPlayed: this.turn, movedThisTurn: false, token: !!opts.token, revealed: !opts.staged,
-      wasHeld: (opts.hc?.age || 0) >= 2, age: opts.hc?.age || 0,
     };
-    if (opts.hc?.extra) { bc.base += opts.hc.extra; bc.extra = opts.hc.extra; }
-    if (def.id === 'patient_monk') bc.base += Math.min(6, opts.hc?.age || 0);
+    if (opts.hc?.extra) bc.extra = opts.hc.extra;
     lane.slotsBy[side][slot] = bc;
     if (!opts.staged) this.push({ t: 'spawn', bid: bc.bid, lane: laneIdx, side });
     return bc;
@@ -444,11 +452,13 @@ export class Battle {
   gainEnergy(n) { this.side.energy += n; }
   gold(n) { if (this.me !== PLAYER) return; this.run.pendingGold = (this.run.pendingGold || 0) + n; this.push({ t: 'gold', n }); }
 
-  addToHand(def, inst = null, costMod = 0) {
-    if (this.hand.length >= MAX_HAND) return null;
+  drawNextTurn(n = 1) { this.side.drawNext += n; }
+
+  queueCard(def, inst = null, costMod = 0) {
+    if (this.side.nextHand.length >= MAX_HAND - DRAW_PER_TURN) return null;
     const hc = this.makeHandCard(inst || { id: def.id, uid: 'tmp' + BID, temp: true, sockets: [] }, def);
     hc.costMod = costMod;
-    this.hand.push(hc);
+    this.side.nextHand.push(hc);
     return hc;
   }
 
@@ -490,7 +500,7 @@ export class Battle {
           if (this.boss?.enemyCanPlay && this.boss.enemyCanPlay(this, hc, l)) continue;
           const lane = this.lanes[l];
           const diff = lane.totals[0] - est[l];
-          let score = this.basePowerOf(hc.def, hc.inst) + c.cost * 1.2;
+          let score = this.handPower(hc) + c.cost * 1.2;
           if (diff >= -3 && diff <= 9) score += 4; else if (diff > 16) score -= 5; else if (diff < -12) score -= 3;
           if (style.lane != null && l === style.lane) score += 2;
           if (hc.def.tags?.includes('ongoing')) score += style.ongoing || 0;
@@ -501,7 +511,7 @@ export class Battle {
         if (!best) break;
         // keep a little energy for a bigger card next turn sometimes
         this.play(best.hc.hid, best.l, ENEMY);
-        est[best.l] += this.basePowerOf(best.hc.def, best.hc.inst);
+        est[best.l] += this.handPower(best.hc);
       }
     });
   }
@@ -540,6 +550,8 @@ export class Battle {
     for (const r of this.relics) if (r.bank) this.S[PLAYER].bank = Math.min(r.bank, this.S[PLAYER].energy);
     for (const s of [0, 1]) this.S[s].staged = [];
     if (this.turn >= this.maxTurns) { this.finish(); return; }
+    // Routine cleanup feeds the next shuffle without triggering effect discards.
+    for (const side of this.S) side.discard.push(...side.hand.splice(0).filter((hc) => !hc.inst?.temp));
     this.beginTurn();
   }
 

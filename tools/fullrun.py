@@ -28,6 +28,12 @@ JS = """async (warden) => {
     if (s === 'purge') { A.purgeCard({uid: G.run.deck[0].uid}); continue; }
     if (s === 'mirror') { A.mirrorCard({uid: G.run.deck[G.run.deck.length-1].uid}); continue; }
     if (s === 'shop') { A.buy({i: 0}); A.leaveNode(); continue; }
+    if (s === 'gem') {
+      const id = G.run.node.gemChoices[0];
+      const card = G.run.deck.find((c) => R.canSocket(c, id));
+      if (card) { A.chooseGem({id}); A.modalPick({uid: card.uid}); } else A.leaveNode();
+      continue;
+    }
     if (['forge','treasure'].includes(s)) { A.leaveNode(); continue; }
     return {ok: false, stuck: s};
   }

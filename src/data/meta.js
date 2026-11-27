@@ -3,11 +3,11 @@ export const UNLOCKS = [
   // Wardens (each brings their card cache)
   { id: 'warden_tide', kind: 'Warden', name: 'Mira, the Tidecaller', desc: 'A Move-focused warden. Also unlocks the Tide card cache, Tide relics and the Riverbank.', cost: 40, grants: ['cache_tide', 'relics_tide', 'locs_tide'] },
   { id: 'warden_pyre', kind: 'Warden', name: 'Ashka, the Pyre-Saint', desc: 'A Destroy-focused warden. Also unlocks the Ash card cache and Ash relics.', cost: 60, grants: ['cache_ash', 'relics_ash'] },
-  { id: 'warden_hex', kind: 'Warden', name: 'Vesk, the Hexwright', desc: 'A Discard/Hold warden. Also unlocks the Hex card cache and Hex relics.', cost: 80, grants: ['cache_hex', 'relics_hex'] },
+  { id: 'warden_hex', kind: 'Warden', name: 'Vesk, the Hexwright', desc: 'A discard warden. Also unlocks the Hex card cache and Hex relics.', cost: 80, grants: ['cache_hex', 'relics_hex'] },
   { id: 'warden_forge', kind: 'Warden', name: 'Brannoc, the Forgemaster', desc: 'A gem-and-socket warden. Unlocks the Siege card cache.', cost: 100, grants: ['cache_siege'] },
   // Card caches
   { id: 'cache_siege', kind: 'Cards', name: 'Siege Cache', desc: '6 Strike cards: Catapult Crew, Ballista, Siegecrafter, Storm Caller, Saboteur, Arbalest.', cost: 30 },
-  { id: 'cache_patience', kind: 'Cards', name: 'Patience Cache', desc: '5 Hold cards: Patient Monk, Sleeper Giant, Oathkeeper, Crystal Golem, Time Weaver.', cost: 30 },
+  { id: 'cache_patience', kind: 'Cards', name: 'Patience Cache', desc: '5 cards that reward timing and Energy management.', cost: 30 },
   { id: 'cache_tribes', kind: 'Cards', name: 'Banner Cache', desc: '7 tribe lords and allies: Knight Captain, Spirit Caller, Cog Marshal, Fiend Lord, Sage Elder, Beast Tamer, Starlit Unicorn.', cost: 35 },
   { id: 'cache_gold', kind: 'Cards', name: 'Gilded Cache', desc: '3 greedy cards: Merchant Prince, Gilded Golem, Golden Hen.', cost: 25 },
   { id: 'cache_crowns', kind: 'Cards', name: 'Crown Cache', desc: '6 legendaries: Elder Dragon, Sun Titan, Abyssal Leviathan, Void Oracle, World Serpent, Abyss Maw.', cost: 90, requires: 'cache_tribes' },
@@ -15,7 +15,7 @@ export const UNLOCKS = [
   { id: 'cache_ash', kind: 'Cards', name: 'Ash Cache', desc: 'Destroy cards (included with Ashka).', cost: 35 },
   { id: 'cache_hex', kind: 'Cards', name: 'Hex Cache', desc: 'Discard cards (included with Vesk).', cost: 35 },
   // Gems
-  { id: 'gem_echo', kind: 'Gems', name: 'Echo Gem', desc: 'Adds the Echo Gem (On Reveal triggers twice) to shops and drops.', cost: 25 },
+  { id: 'gem_echo', kind: 'Gems', name: 'Echo Gem', desc: 'Adds the Echo Gem (On Reveal triggers twice) to Gem nodes and shops.', cost: 25 },
   { id: 'gem_bulwark', kind: 'Gems', name: 'Bulwark Gem', desc: "Adds the Bulwark Gem (can't be destroyed or weakened).", cost: 20 },
   { id: 'gem_drift', kind: 'Gems', name: 'Drift Gem', desc: 'Adds the Drift Gem (gains Move).', cost: 20 },
   { id: 'gem_surge', kind: 'Gems', name: 'Surge Gem', desc: 'Adds the Surge Gem (+4 when played on turn 5+).', cost: 20 },

@@ -27,8 +27,8 @@ home('garden', 'Hearth Garden', 'Win your Home lane: a random card there permane
   },
 });
 home('bell_tower', 'Bell Tower', "Turn 1: Your opponent can't play cards in your Home.", 'bell', { battleStart(b, lane) { b.freeze(lane.idx); } });
-home('library', 'Reading Room', 'The first card you play in your Home each turn draws a card.', 'book', {
-  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.revealedHereThisTurn === 0) b.drawCards(1); },
+home('library', 'Reading Room', 'The first card you play in your Home each turn draws 1 extra card next turn.', 'book', {
+  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.revealedHereThisTurn === 0) b.drawNextTurn(); },
 });
 home('ramparts', 'Ramparts', "Your cards in your Home can't be destroyed or weakened.", 'shield', { ongoing(b, lane) { lane.flags.protect = true; } });
 home('beacon_spire', 'Beacon Spire', 'Your cards in the outer lanes have +1 Power if you are winning your Home.', 'tower', {

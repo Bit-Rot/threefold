@@ -25,8 +25,8 @@ C('stone_giant', 'Stone Giant', 6, 12, 'uncommon', 'Construct', '', { f: 'golem'
 C('sprite', 'Hearth Sprite', 1, 1, 'common', 'Spirit', 'On Reveal: Give another card here +2.', { f: 'wisp', pal: 'dawn', bg: 'forest' }, {
   tags: ['reveal'], onReveal(b, bc) { const o = others(b, bc); if (o.length) b.buff(b.rng.pick(o), 2); },
 });
-C('hearth_cook', 'Hearth Cook', 2, 2, 'common', 'Sage', 'On Reveal: Draw a card.', { f: 'hum', hat: 'chef', item: 'ladle', pal: 'ember', bg: 'tavern' }, {
-  tags: ['reveal'], onReveal(b) { b.drawCards(1); },
+C('hearth_cook', 'Hearth Cook', 2, 2, 'common', 'Sage', 'On Reveal: Draw 1 extra card next turn.', { f: 'hum', hat: 'chef', item: 'ladle', pal: 'ember', bg: 'tavern' }, {
+  tags: ['reveal'], onReveal(b) { b.drawNextTurn(); },
 });
 C('drummer', 'War Drummer', 3, 3, 'common', 'Knight', 'On Reveal: Your other cards here get +1.', { f: 'hum', hat: 'feather', item: 'drum', pal: 'crimson', bg: 'field' }, {
   tags: ['reveal'], onReveal(b, bc) { for (const c of others(b, bc)) b.buff(c, 1); },
@@ -49,14 +49,14 @@ C('frost_witch', 'Frost Witch', 3, 2, 'uncommon', 'Spirit', 'On Reveal: Freeze t
 C('thunder_hawk', 'Thunder Hawk', 4, 4, 'uncommon', 'Beast', 'On Reveal: Strike 2 in every lane.', { f: 'bird', pal: 'storm', bg: 'storm' }, {
   tags: ['reveal', 'strike'], onReveal(b) { for (let i = 0; i < 3; i++) b.strike(i, 2); },
 });
-C('mirror_imp', 'Mirror Imp', 2, 1, 'uncommon', 'Fiend', 'On Reveal: Add a copy of a random card from your deck to your hand. It costs 1 less.', { f: 'imp', pal: 'violet', bg: 'void' }, {
+C('mirror_imp', 'Mirror Imp', 2, 1, 'uncommon', 'Fiend', 'On Reveal: Copy a random card from your draw or discard pile into next turn’s hand. It costs 1 less.', { f: 'imp', pal: 'violet', bg: 'void' }, {
   tags: ['reveal'], onReveal(b) {
-    const pool = b.drawPile.filter((h) => h.def.id !== 'mirror_imp');
-    if (pool.length) { const h = b.rng.pick(pool); b.addToHand(h.def, null, -1); }
+    const pool = [...b.drawPile, ...b.discardPile].filter((h) => h.def.id !== 'mirror_imp');
+    if (pool.length) b.queueCard(b.rng.pick(pool).def, null, -1);
   },
 });
-C('scholar', 'Scholar', 2, 1, 'common', 'Sage', 'On Reveal: Draw 2 cards.', { f: 'hum', hat: 'scholar', item: 'book', pal: 'ocean', bg: 'library' }, {
-  tags: ['reveal'], onReveal(b) { b.drawCards(2); },
+C('scholar', 'Scholar', 2, 1, 'common', 'Sage', 'On Reveal: Draw 2 extra cards next turn.', { f: 'hum', hat: 'scholar', item: 'book', pal: 'ocean', bg: 'library' }, {
+  tags: ['reveal'], onReveal(b) { b.drawNextTurn(2); },
 });
 C('alchemist', 'Alchemist', 2, 2, 'common', 'Sage', 'On Reveal: The next card you play costs 2 less.', { f: 'hum', hat: 'goggles', item: 'potion', pal: 'moss', bg: 'library' }, {
   tags: ['reveal'], onReveal(b) { b.nextCostReduction = 2; },
@@ -162,7 +162,7 @@ C('beacon', 'Signal Beacon', 4, 1, 'uncommon', 'Construct', 'Ongoing: Your cards
 C('soulbinder', 'Soulbinder', 4, 2, 'rare', 'Fiend', 'Ongoing: +2 power for each card destroyed this fight.', { f: 'hum', hat: 'horns', item: 'chain', pal: 'shadow', bg: 'grave' }, {
   tags: ['ongoing', 'destroy'], set: 'cache_ash', ongoing(b, bc) { b.aura(bc, 2 * b.destroyedCount); },
 });
-C('wailing_shade', 'Wailing Shade', 2, 1, 'uncommon', 'Spirit', "Ongoing: +1 power for each card you've discarded this fight.", { f: 'ghost', pal: 'frost', bg: 'grave' }, {
+C('wailing_shade', 'Wailing Shade', 2, 1, 'uncommon', 'Spirit', 'Ongoing: +1 Power per card discarded by an effect this fight (max +12).', { f: 'ghost', pal: 'frost', bg: 'grave' }, {
   tags: ['ongoing', 'discard'], set: 'cache_hex', ongoing(b, bc) { b.aura(bc, Math.min(12, b.discardedCount)); },
 });
 C('gold_golem', 'Gilded Golem', 3, 2, 'uncommon', 'Construct', 'Ongoing: +1 power for every 30 gold you have (max +6).', { f: 'golem', pal: 'gold', bg: 'market' }, {
@@ -220,8 +220,8 @@ C('blink_fox', 'Blink Fox', 1, 2, 'common', 'Beast', 'Move. After this moves, St
 C('gale_rider', 'Gale Rider', 4, 4, 'uncommon', 'Knight', 'Move. Whenever one of your cards moves, +1 power.', { f: 'hum', hat: 'helm', item: 'lance', pal: 'storm', bg: 'sky' }, {
   tags: ['move'], move: true, set: 'cache_tide', onAnyMove(b, bc, moved) { b.buff(bc, 1); },
 });
-C('drift_courier', 'Drift Courier', 2, 2, 'common', 'Sage', 'Move. After this moves, draw a card.', { f: 'hum', hat: 'cap', item: 'satchel', pal: 'ocean', bg: 'sky' }, {
-  tags: ['move'], move: true, set: 'cache_tide', onMoved(b) { b.drawCards(1); },
+C('drift_courier', 'Drift Courier', 2, 2, 'common', 'Sage', 'Move. After this moves, draw 1 extra card next turn.', { f: 'hum', hat: 'cap', item: 'satchel', pal: 'ocean', bg: 'sky' }, {
+  tags: ['move'], move: true, set: 'cache_tide', onMoved(b) { b.drawNextTurn(); },
 });
 C('stormrunner', 'Stormrunner', 3, 3, 'uncommon', 'Knight', 'Move. After this moves, your other cards in its new lane get +1.', { f: 'hum', hat: 'hood', item: 'spear', pal: 'storm', bg: 'storm' }, {
   tags: ['move'], move: true, set: 'cache_tide', onMoved(b, bc) { for (const c of others(b, bc)) b.buff(c, 1); },
@@ -231,8 +231,8 @@ C('stormrunner', 'Stormrunner', 3, 3, 'uncommon', 'Knight', 'Move. After this mo
 C('ashling', 'Ashling', 1, 2, 'common', 'Spirit', 'When destroyed: Strike 3 here.', { f: 'wisp', pal: 'ember', bg: 'fire' }, {
   tags: ['destroy', 'strike'], set: 'cache_ash', onDestroyed(b, bc) { b.strike(bc.lane, 3); },
 });
-C('phoenix_chick', 'Phoenix Chick', 2, 2, 'uncommon', 'Beast', 'When destroyed: Return it to your hand with +2 power.', { f: 'bird', pal: 'ember', bg: 'fire' }, {
-  tags: ['destroy'], set: 'cache_ash', onDestroyed(b, bc) { if (!bc.inst || bc.inst.temp) return; const h = b.addToHand(bc.def, bc.inst); if (h) { h.extra = (bc.extra || 0) + 2; bc.returned = true; } },
+C('phoenix_chick', 'Phoenix Chick', 2, 2, 'uncommon', 'Beast', 'When destroyed: Return it to next turn’s hand with +2 Power.', { f: 'bird', pal: 'ember', bg: 'fire' }, {
+  tags: ['destroy'], set: 'cache_ash', onDestroyed(b, bc) { if (!bc.inst || bc.inst.temp) return; const h = b.queueCard(bc.def, bc.inst); if (h) { h.extra = (bc.extra || 0) + 2; bc.returned = true; } },
 });
 C('cinder_imp', 'Cinder Imp', 1, 3, 'common', 'Fiend', 'When destroyed: Your other cards here get +2.', { f: 'imp', pal: 'ember', bg: 'fire' }, {
   tags: ['destroy'], set: 'cache_ash', onDestroyed(b, bc) { for (const c of b.cardsIn(bc.lane)) b.buff(c, 2); },
@@ -261,15 +261,15 @@ C('whisper_rat', 'Whisper Rat', 1, 2, 'common', 'Beast', 'Lingering: When this i
   tags: ['discard'], set: 'cache_hex', onDiscard(b) { b.gold(3); },
 });
 
-// ---------------- Hold ----------------
-C('patient_monk', 'Patient Monk', 2, 1, 'uncommon', 'Sage', '+1 Power for each turn this spent in your hand (max +6).', { f: 'hum', hat: 'bald', item: 'beads', pal: 'dawn', bg: 'temple' }, {
-  tags: ['hold'], set: 'cache_patience',
+// ---------------- Late-game cards ----------------
+C('patient_monk', 'Patient Monk', 2, 1, 'uncommon', 'Sage', 'Has +1 Power for each turn after the first when played (max +5).', { f: 'hum', hat: 'bald', item: 'beads', pal: 'dawn', bg: 'temple' }, {
+  set: 'cache_patience', handPower(b) { return Math.min(5, b.turn - 1); },
 });
-C('sleeper_giant', 'Sleeper Giant', 5, 8, 'uncommon', 'Construct', 'Costs 1 less for each turn it spent in your hand.', { f: 'golem', pal: 'moss', bg: 'cave' }, {
-  tags: ['hold'], set: 'cache_patience', costFn(b, hc) { return -(hc.age || 0); },
+C('sleeper_giant', 'Sleeper Giant', 5, 8, 'uncommon', 'Construct', 'Costs 1 less for each turn after turn 2 (max 3 less).', { f: 'golem', pal: 'moss', bg: 'cave' }, {
+  set: 'cache_patience', costFn(b) { return -Math.min(3, Math.max(0, b.turn - 2)); },
 });
-C('oathkeeper', 'Oathkeeper', 3, 3, 'uncommon', 'Knight', 'On Reveal: If this spent 2+ turns in your hand, your other cards here get +2.', { f: 'hum', hat: 'greathelm', item: 'greatsword', pal: 'gold', bg: 'temple' }, {
-  tags: ['hold', 'reveal'], set: 'cache_patience', onReveal(b, bc) { if (bc.wasHeld) for (const c of others(b, bc)) b.buff(c, 2); },
+C('oathkeeper', 'Oathkeeper', 3, 3, 'uncommon', 'Knight', 'On Reveal: From turn 3 on, your other cards here get +2 Power.', { f: 'hum', hat: 'greathelm', item: 'greatsword', pal: 'gold', bg: 'temple' }, {
+  tags: ['reveal'], set: 'cache_patience', onReveal(b, bc) { if (b.turn >= 3) for (const c of others(b, bc)) b.buff(c, 2); },
 });
 
 // ---------------- Tribe lords ----------------
@@ -288,8 +288,8 @@ C('fiend_lord', 'Fiend Lord', 4, 4, 'uncommon', 'Fiend', 'Ongoing: Your other Fi
 C('sage_elder', 'Sage Elder', 3, 2, 'uncommon', 'Sage', 'Ongoing: Your other Sages have +1.', { f: 'hum', hat: 'wizard', item: 'staff', pal: 'ocean', bg: 'library' }, {
   tags: ['ongoing'], set: 'cache_tribes', ongoing(b, bc) { for (const c of b.allCards()) if (c !== bc && c.def.tribe === 'Sage') b.aura(c, 1); },
 });
-C('beast_tamer', 'Beast Tamer', 2, 2, 'common', 'Beast', 'On Reveal: Your Beasts in hand cost 1 less.', { f: 'hum', hat: 'bandana', item: 'whip', pal: 'forest', bg: 'field' }, {
-  tags: ['reveal'], set: 'cache_tribes', onReveal(b) { for (const h of b.hand) if (h.def.tribe === 'Beast') h.costMod -= 1; },
+C('beast_tamer', 'Beast Tamer', 2, 2, 'common', 'Beast', 'On Reveal: Your other Beasts here gain +2 Power.', { f: 'hum', hat: 'bandana', item: 'whip', pal: 'forest', bg: 'field' }, {
+  tags: ['reveal'], set: 'cache_tribes', onReveal(b, bc) { for (const c of others(b, bc)) if (c.def.tribe === 'Beast') b.buff(c, 2); },
 });
 
 // ---------------- Legendaries ----------------
@@ -299,8 +299,8 @@ C('elder_dragon', 'Elder Dragon', 6, 9, 'legendary', 'Beast', 'On Reveal: Strike
 C('sun_titan', 'Sun Titan', 6, 8, 'legendary', 'Knight', 'On Reveal: Your other cards get +2.', { f: 'hum', hat: 'halo', item: 'greatsword', pal: 'gold', bg: 'sky' }, {
   tags: ['reveal'], set: 'cache_crowns', onReveal(b, bc) { for (const c of b.allCards()) if (c !== bc) b.buff(c, 2); },
 });
-C('void_oracle', 'Void Oracle', 5, 4, 'legendary', 'Sage', 'On Reveal: Draw 3 cards. They cost 1 less.', { f: 'eye', pal: 'violet', bg: 'void' }, {
-  tags: ['reveal'], set: 'cache_crowns', onReveal(b) { const before = b.hand.length; b.drawCards(3); for (const h of b.hand.slice(before)) h.costMod -= 1; },
+C('void_oracle', 'Void Oracle', 5, 4, 'legendary', 'Sage', 'On Reveal: Next turn, draw 2 extra cards and gain 2 Energy.', { f: 'eye', pal: 'violet', bg: 'void' }, {
+  tags: ['reveal'], set: 'cache_crowns', onReveal(b) { b.drawNextTurn(2); b.gainEnergyNext(2); },
 });
 C('starlit_unicorn', 'Starlit Unicorn', 4, 4, 'rare', 'Beast', 'Ongoing: Your cards in adjacent lanes have +1.', { f: 'unicorn', pal: 'dawn', bg: 'sky' }, {
   tags: ['ongoing'], set: 'cache_tribes', ongoing(b, bc) { for (const c of b.allCards()) if (b.adjacent(bc.lane).includes(c.lane)) b.aura(c, 1); },
@@ -323,21 +323,21 @@ E('world_tree', 'World Tree', 1, 2, 'Spirit', 'End of turn: Your cards here get 
 E('moon_howler', 'Moon Howler', 3, 4, 'Beast', 'Ongoing: +8 if this is your only card here. Your Beasts in other lanes have +1.', { f: 'wolf', pal: 'frost', bg: 'night' }, {
   tags: ['ongoing'], ongoing(b, bc) { if (!others(b, bc).length) b.aura(bc, 8); for (const c of b.allCards()) if (c.lane !== bc.lane && c.def.tribe === 'Beast') b.aura(c, 1); },
 });
-E('ashen_phoenix', 'Ashen Phoenix', 2, 3, 'Beast', 'End of turn: Strike 1 here. When destroyed: Return it to your hand with +3 power.', { f: 'bird', pal: 'gold', bg: 'fire' }, {
+E('ashen_phoenix', 'Ashen Phoenix', 2, 3, 'Beast', 'End of turn: Strike 1 here. When destroyed: Return it to next turn’s hand with +3 Power.', { f: 'bird', pal: 'gold', bg: 'fire' }, {
   tags: ['destroy', 'strike'], endTurn(b, bc) { b.strike(bc.lane, 1); },
-  onDestroyed(b, bc) { if (!bc.inst || bc.inst.temp) return; const h = b.addToHand(bc.def, bc.inst); if (h) { h.extra = (bc.extra || 0) + 3; bc.returned = true; } },
+  onDestroyed(b, bc) { if (!bc.inst || bc.inst.temp) return; const h = b.queueCard(bc.def, bc.inst); if (h) { h.extra = (bc.extra || 0) + 3; bc.returned = true; } },
 });
 E('tempest_dancer', 'Tempest Dancer', 3, 4, 'Spirit', 'Move. After this moves, +3 power and Strike 2 in its new lane.', { f: 'hum', hat: 'veil', item: 'fan', pal: 'storm', bg: 'storm' }, {
   tags: ['move', 'strike'], move: true, onMoved(b, bc) { b.buff(bc, 3); b.strike(bc.lane, 2); },
 });
-E('archmage', 'Archmage', 3, 2, 'Sage', 'On Reveal: Draw 2 cards. The next card you play costs 3 less.', { f: 'hum', hat: 'wizard', item: 'orb', pal: 'violet', bg: 'void' }, {
-  tags: ['reveal'], onReveal(b) { b.drawCards(2); b.nextCostReduction = 3; },
+E('archmage', 'Archmage', 3, 2, 'Sage', 'On Reveal: Draw 2 extra cards next turn. The next card you play costs 3 less.', { f: 'hum', hat: 'wizard', item: 'orb', pal: 'violet', bg: 'void' }, {
+  tags: ['reveal'], onReveal(b) { b.drawNextTurn(2); b.nextCostReduction += 3; },
 });
 E('champion', 'Champion', 1, 4, 'Knight', 'On Reveal: Your other cards here get +2.', { f: 'hum', hat: 'plume', item: 'greatsword', pal: 'gold', bg: 'castle' }, {
   tags: ['reveal'], onReveal(b, bc) { for (const c of others(b, bc)) b.buff(c, 2); },
 });
-E('ash_queen', 'Ash Queen', 3, 3, 'Fiend', 'On Reveal: Discard your hand. For each card discarded, +3 power and Strike 2 here.', { f: 'hum', hat: 'crown', item: 'torch', pal: 'ember', bg: 'fire' }, {
-  tags: ['reveal', 'discard'], onReveal(b, bc) { let n = 0; for (const h of b.hand.slice()) { b.discardHandCard(h); n++; } b.buff(bc, 3 * n); for (let i = 0; i < n; i++) b.strike(bc.lane, 2); },
+E('ash_queen', 'Ash Queen', 3, 3, 'Fiend', 'On Reveal: Discard up to 3 random cards. For each one, gain 2 Power and Strike 2 here.', { f: 'hum', hat: 'crown', item: 'torch', pal: 'ember', bg: 'fire' }, {
+  tags: ['reveal', 'discard'], onReveal(b, bc) { const n = b.discardRandom(3); b.buff(bc, 2 * n); for (let i = 0; i < n; i++) b.strike(bc.lane, 2); },
 });
 E('gilded_dragon', 'Gilded Dragon', 4, 6, 'Beast', 'On Reveal: Strike 3 in every lane. End of turn: Gain 4 gold.', { f: 'dragon', pal: 'gold', bg: 'market' }, {
   tags: ['reveal', 'strike'], onReveal(b) { for (let i = 0; i < 3; i++) b.strike(i, 3); }, endTurn(b) { b.gold(4); },
@@ -368,7 +368,6 @@ export const TOKENS = {
   twin: { id: 'twin', name: 'Twin', cost: 0, power: 2, rarity: 'token', tribe: 'Knight', text: 'A summoned double.', art: { f: 'hum', hat: 'bandana', item: 'daggers', pal: 'shadow', bg: 'ruins' }, tags: [], token: true },
 };
 
-// Patient Monk bonus is applied in place(): handled via basePowerOf hook below.
 export const CARDS = Object.fromEntries(L.map((c) => [c.id, c]));
 export const CARD_LIST = L;
 export function cardDef(id) { return CARDS[id] || TOKENS[id]; }

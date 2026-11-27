@@ -82,6 +82,7 @@ b { color: #fff; }
 /* map */
 .map { display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 30%, rgba(30, 18, 40, 0.3), rgba(8, 6, 14, 0.85)); }
 .maptitle { text-align: center; font-family: var(--serif); color: var(--gold); font-size: 20px; margin: 4px 0; }
+.map-hint { margin: 4px 12px; text-align: center; color: var(--dim); font-size: 13px; }
 .mapwrap { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 0 14px; min-height: 0; }
 .maplines { position: absolute; inset: 0; pointer-events: none; }
 .maplines path { fill: none; stroke: rgba(232, 210, 154, 0.25); stroke-width: 3; stroke-dasharray: 6 8; }
@@ -97,6 +98,7 @@ b { color: #fff; }
 .node.sel img { box-shadow: 0 0 0 4px #fff, 0 0 20px #ffc070; }
 .node.boss img { width: 70px; height: 70px; border-color: #ff4060; }
 .node.elite img { border-color: #ff9040; }
+.node.gem img { border-color: #d68dfa; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.6); } 50% { box-shadow: 0 0 0 8px rgba(242, 193, 78, 0); } }
 .preview { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(560px, 94vw); background: rgba(20, 14, 30, 0.97); border: 1px solid var(--line); border-radius: 16px; padding: 12px; z-index: 6; text-align: center; }
 .preview h3, .preview p { margin: 4px 0; }
@@ -183,7 +185,8 @@ img.card { width: 100%; display: block; border-radius: 6%; cursor: pointer; }
 .price { font-weight: 800; color: var(--gold2); margin-top: 4px; font-size: 15px; }
 .price.bad { color: var(--bad); }
 .shop-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; }
-.shop-mini { background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; gap: 4px; cursor: pointer; }
+.shop-mini { background: rgba(0, 0, 0, 0.3); color: var(--text); font: inherit; border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; gap: 4px; cursor: pointer; }
+.shop-mini:disabled { opacity: 0.5; cursor: default; }
 .shop-mini img { width: 52px; height: 52px; }
 .gem { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--g); border-radius: 999px; background: rgba(0, 0, 0, 0.35); cursor: pointer; font-size: 13px; font-weight: 700; }
 .gem i { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, var(--g) 45%, #000); }

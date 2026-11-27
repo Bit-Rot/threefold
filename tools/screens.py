@@ -22,16 +22,12 @@ async def main():
         await pg.click('[data-a=pickWarden][data-id=tidecaller]'); await pg.click('[data-a=heat][data-d="1"]'); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'shots/{TAG}_wardens.png')
         await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(400)
-        await pg.evaluate("""() => { const G = window.__G; G.run.gold = 500; G.run.gems.push('evo','echo','ember'); G.run.deck.push(window.__R.makeInst(G.run,'slinger'), window.__R.makeInst(G.run,'ballista')); }""")
-        for t in ['shop', 'forge', 'event', 'home', 'camp', 'treasure', 'purge', 'mirror']:
-            await pg.evaluate("""(t) => { const G = window.__G; const n = G.run.map.rows.flat().find(n => !n.enc) ; n.type = t; G.run.node = null; window.__openNode(n.id); }""", t)
+        await pg.evaluate("""() => { const G = window.__G; G.run.gold = 500; G.run.deck.push(window.__R.makeInst(G.run,'slinger',{sockets:['evo']}), window.__R.makeInst(G.run,'ballista')); }""")
+        for t in ['shop', 'gem', 'forge', 'event', 'home', 'camp', 'treasure', 'purge', 'mirror']:
+            await pg.evaluate("""(t) => { const r = window.__G.run; const n = r.map.rows[1][0]; n.type = t; r.pos = r.map.rows[0][0].id; r.node = null; window.__openNode(n.id); }""", t)
             await pg.wait_for_timeout(400)
-            if t == 'forge':
-                await pg.click('[data-a=pickGem]'); await pg.wait_for_timeout(200)
             await pg.screenshot(path=f'shots/{TAG}_{t}.png')
             if t == 'forge':
-                await pg.click('[data-a=socketInto]'); await pg.wait_for_timeout(200)
-                await pg.click('[data-a=forgeTab][data-t=evolve]'); await pg.wait_for_timeout(300)
                 await pg.screenshot(path=f'shots/{TAG}_forge_evo.png')
                 btn = await pg.query_selector('[data-a=evolve]')
                 if btn: await btn.click(); await pg.wait_for_timeout(300)
@@ -45,7 +41,7 @@ async def main():
         await pg.screenshot(path=f'shots/{TAG}_codex.png')
         # boss battle
         await pg.click('[data-a=title]'); await pg.click('[data-a=continue]'); await pg.wait_for_timeout(500)
-        await pg.evaluate("""() => { const G = window.__G; const r = G.run; const boss = r.map.rows[4][0]; r.node=null; window.__openNode(boss.id); }""")
+        await pg.evaluate("""() => { const r = window.__G.run; const boss = r.map.rows.at(-1)[0]; r.pos = r.map.rows.at(-2)[0].id; r.node = null; window.__openNode(boss.id); }""")
         await pg.wait_for_timeout(1500)
         await pg.screenshot(path=f'shots/{TAG}_boss.png')
         for l in logs[:30]: print(l)

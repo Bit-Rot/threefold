@@ -21,9 +21,8 @@ async def main():
         await pg.click('[data-a=newRun]'); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'shots/{TAG}_wardens.png')
         await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(600)
-        await pg.click('.node.avail'); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'shots/{TAG}_map.png')
-        await pg.click('[data-a=enterNode]'); await pg.wait_for_timeout(1500)
+        await pg.locator('.node.avail').first.click(); await pg.wait_for_timeout(1500)
         await pg.screenshot(path=f'shots/{TAG}_battle0.png')
         for turn in range(6):
             # play cards by tapping hand card then lane center

@@ -1,6 +1,6 @@
 // Game controller + HTML UI for every screen.
 import * as THREE from 'three';
-import { Battle } from './engine/battle.js';
+import { Battle, DRAW_PER_TURN, MAX_HAND } from './engine/battle.js';
 import * as R from './engine/run.js';
 import { CARDS, CARD_LIST, EVO_RECIPES, RARITY_COLOR, TRIBES, cardDef } from './data/cards.js';
 import { GEMS, GEM_LIST } from './data/gems.js';
@@ -79,8 +79,7 @@ function topbar(extra = '') {
   return `<div class="topbar" id="topbar">
     <div class="tb-left"><span class="hearts">${heartIcons(r)}</span>
     <span class="pill gold"><img src="${glyphURL('coin', 40)}">${r.gold}</span>
-    <span class="pill gems" data-a="showGems"><span class="gemdot"></span>${r.gems.length}</span>
-    <span class="pill act">Act ${r.act}</span></div>
+    <span class="pill act">Boss ${r.act}/${R.ACTS}</span></div>
     <div class="tb-relics">${r.relics.map((id) => `<img class="relic" data-a="relicInfo" data-id="${id}" title="${esc(RELICS[id].name)}" src="${glyphURL(RELICS[id].icon, 64, '#3a2f48')}">`).join('')}</div>
     <div class="tb-right">${extra}<button class="btn sm" data-a="deck">Deck ${r.deck.length}</button><button class="btn sm ghost" data-a="menu">☰</button></div>
   </div>`;
@@ -98,7 +97,7 @@ SCREENS.title = () => {
     <div class="logo"><span>THREE</span><span class="fold">FOLD</span></div>
     <p class="tagline">Three lanes. Six turns. One run to break the machines.</p>
     <div class="menu-col">
-      ${saved && !saved.over ? `<button class="btn big" data-a="continue">Continue Run <small>Act ${saved.act} · ${WARDENS[saved.warden]?.name}</small></button>` : ''}
+      ${saved && !saved.over ? `<button class="btn big" data-a="continue">Continue Run <small>Boss ${saved.act}/${R.ACTS} · ${WARDENS[saved.warden]?.name}</small></button>` : ''}
       <button class="btn big primary" data-a="newRun">New Run</button>
       <button class="btn" data-a="archive">The Archive <small>${G.meta.shards} ✦ shards</small></button>
       <button class="btn" data-a="codex">Codex</button>
@@ -112,11 +111,11 @@ SCREENS.title = () => {
 SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <h2>How to Play</h2>
   <p><b>Fights.</b> You and an opponent each play cards with <b>Power</b> into your own side of three lanes. After 6 turns, whoever has more Power in a lane wins it. <b>Win 2 of 3 lanes to win the fight</b> (if lanes are tied, total Power decides).</p>
-  <p><b>Turns.</b> Your Energy each turn equals the turn number (1 on turn 1, 6 on turn 6). You start with 3 cards and draw 1 each turn; your hand holds up to 7. Cards you play are placed face-down and <b>reveal at the end of the turn</b>, at the same time as your opponent's. Whoever is winning more lanes reveals first. Tap a face-down card to take it back. The middle lane is your <b>Home</b>: upgrade it over the run.</p>
-  <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when discarded from your hand. <b>Junk</b>: 0-Power clutter that fills slots.</p>
-  <p><b>The run.</b> Three acts, each ending in a boss. After every fight you <b>must</b> add a card. Shape your deck at Shops, Forges (socket gems, Evolve, Fuse duplicates), Shrines (remove), Mirror Pools (clone) and Campfires (upgrade or heal). Lose a fight and you lose a heart; lose all hearts and the run ends.</p>
+  <p><b>Turns.</b> Your Energy each turn equals the turn number. Both sides draw up to ${DRAW_PER_TURN} fresh cards each turn, with room for ${MAX_HAND} including bonuses. Unplayed cards go back into circulation. Face-down plays reveal at the end of the turn, starting with whoever leads in more lanes. Tap a face-down card to take it back. The middle lane is your <b>Home</b>.</p>
+  <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when an effect discards the card. <b>Junk</b>: 0-Power clutter that fills slots.</p>
+  <p><b>The run.</b> Before each of eight bosses, choose one of two paths with two nodes apiece. Add a card to your deck after each fight. At a Gem node or Shop, choose a compatible card to socket the gem immediately. Forges bore empty sockets, evolve cards, and fuse duplicates. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
   <p><b>Gold</b> = the total Power in the lanes you win. <b>Shards</b> are kept between runs; spend them in the Archive on new wardens, card caches, gems, relics, locations and perks.</p>
-  <p><b>Evolution.</b> Socket an <b>Evo Gem</b> into an empty socket on an Evo base card. If you also own its catalyst card, the Forge can evolve it: the catalyst is consumed and the base becomes something new.</p>
+  <p><b>Evolution.</b> Apply an <b>Evo Gem</b> to an Evo base card at a Gem node or Shop. Bring that card and its catalyst to a Forge to evolve the base and consume the catalyst.</p>
   <button class="btn primary" data-a="title">Back</button></div></div>`;
 
 SCREENS.wardens = () => {
@@ -149,7 +148,7 @@ SCREENS.map = () => {
   const nodeHtml = (n) => {
     const can = avail.includes(n.id);
     const done = r.visited?.includes(n.id);
-    return `<button class="node ${n.type} ${can ? 'avail' : ''} ${done ? 'done' : ''} ${r.pos === n.id ? 'here' : ''} ${G.mapSel === n.id ? 'sel' : ''}" data-a="mapNode" data-id="${n.id}" style="--x:${(n.col + 0.5) / n.n}">
+    return `<button class="node ${n.type} ${can ? 'avail' : ''} ${done ? 'done' : ''} ${r.pos === n.id ? 'here' : ''} ${G.mapSel === n.id ? 'sel' : ''}" data-a="mapNode" data-id="${n.id}" aria-label="${esc(R.NODE_INFO[n.type].name + (n.n === 2 ? ' · ' + (n.col === 0 ? 'Left path' : 'Right path') : ''))}" style="--x:${(n.col + 0.5) / n.n}">
       <img src="${glyphURL(n.type, 72)}"><span>${R.NODE_INFO[n.type].name}</span></button>`;
   };
   let preview = '';
@@ -157,10 +156,11 @@ SCREENS.map = () => {
     const showEnc = sel.enc && (scout || avail.includes(sel.id));
     preview = `<div class="preview"><h3>${R.NODE_INFO[sel.type].name}</h3><p>${R.NODE_INFO[sel.type].desc}</p>
       ${sel.enc ? (showEnc ? encPreview(sel.enc, scout) : '<p class="dim">Unknown foes. (Scouting reveals distant fights.)</p>') : ''}
-      ${avail.includes(sel.id) ? `<button class="btn primary" data-a="enterNode" data-id="${sel.id}">Travel here</button>` : '<p class="dim">Not reachable yet.</p>'}</div>`;
+      <p class="dim">Not reachable yet.</p></div>`;
   }
   return `${topbar()}<div class="screen map">
-    <div class="maptitle">Act ${r.act} — ${['The Hollow Road', 'The Clockwork Marches', 'The Grand Foundry'][r.act - 1]}</div>
+    <div class="maptitle">Boss ${r.act} of ${R.ACTS} · ${esc(OPPONENTS[rows[0][0].enc.opponent].name)}</div>
+    ${!r.pos ? '<p class="map-hint">Choose a path by selecting one of the highlighted nodes.</p>' : ''}
     <div class="mapwrap"><svg class="maplines" id="maplines"></svg>
     ${rows.map((row) => `<div class="maprow">${row.map(nodeHtml).join('')}</div>`).join('')}</div>
     ${preview}
@@ -183,7 +183,7 @@ function drawMapLines() {
       const b = wrap.querySelector(`[data-id="${id}"]`); if (!b) continue;
       const br = b.getBoundingClientRect();
       const x1 = ar.left + ar.width / 2 - wr.left, y1 = ar.top + ar.height / 2 - wr.top, x2 = br.left + br.width / 2 - wr.left, y2 = br.top + br.height / 2 - wr.top;
-      const live = G.run.pos === n.id || (!G.run.pos && n.row === 0);
+      const live = G.run.visited.includes(n.id) || (!G.run.pos && n.row === 0);
       html += `<path d="M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}" class="${live ? 'live' : ''}"/>`;
     }
   }
@@ -207,7 +207,7 @@ SCREENS.battle = () => {
       <div class="hand" id="hand">${b.hand.map((hc) => handCard(b, hc)).join('')}</div>
       <div class="handside">
         <button class="btn endturn ${b.over ? 'disabled' : ''}" data-a="endTurn">${b.turn >= b.maxTurns ? 'Finish' : 'End Turn'}</button>
-        <small>Deck ${b.S[0].deck.length} · Hand ${b.S[0].hand.length}/7</small>
+        <small>Deck ${b.S[0].deck.length} · Hand ${b.S[0].hand.length}/${MAX_HAND}</small>
       </div>
     </div>
     ${b.over ? battleResultHtml() : ''}`;
@@ -216,7 +216,7 @@ function handCard(b, hc) {
   const cost = b.minCost(hc);
   const base = hc.def.cost + (hc.inst?.plus ? (hc.def.up?.cost ?? 0) : 0);
   const playable = [0, 1, 2].some((l) => b.canPlay(hc.hid, l).ok);
-  const pw = b.basePowerOf(hc.def, hc.inst) + (hc.extra || 0) + (hc.def.id === 'patient_monk' ? Math.min(6, hc.age || 0) : 0);
+  const pw = b.handPower(hc);
   return `<div class="hc ${G.sel === hc.hid ? 'sel' : ''} ${playable ? 'ok' : 'no'}" data-hid="${hc.hid}">
     <img class="card" draggable="false" src="${cardURL(hc.def, { cost, plus: hc.inst?.plus, sockets: hc.inst?.sockets || [], bonus: hc.inst?.bonus, power: pw })}">
   </div>`;
@@ -228,7 +228,7 @@ function battleResultHtml() {
     <div class="lanes-res">${res.laneResults.map((lr, i) => `<div class="lr ${lr.won ? 'w' : lr.lost ? 'l' : 't'}"><small>${i === 1 ? 'Home' : i === 0 ? 'Left' : 'Right'}</small><b>${lr.player}</b><span>vs</span><b>${lr.enemy}</b></div>`).join('')}</div>
     <p>${res.lanesWon} won · ${res.lanesLost} lost${res.tiebreak ? ' — decided by total Power' : ''}.</p>
     ${out ? `<p class="gains"><span>+${out.gold} gold</span> <span>+${out.shards} ✦</span>${out.heartLost ? ' <span class="bad">−1 heart</span>' : ''}</p>
-    ${out.relic ? `<p>Relic: <b>${esc(RELICS[out.relic].name)}</b></p>` : ''}${out.gem ? `<p>Gem: <b>${esc(GEMS[out.gem].name)}</b></p>` : ''}
+    ${out.relic ? `<p>Relic: <b>${esc(RELICS[out.relic].name)}</b></p>` : ''}
     ${out.notes.map((n) => `<p class="dim">${esc(n)}</p>`).join('')}` : ''}
     <button class="btn big primary" data-a="afterBattle">Continue</button></div></div>`;
 }
@@ -404,7 +404,10 @@ SCREENS.shop = () => {
     <h2>The Wandering Market</h2>
     <div class="shop-cards">${s.items.map((it, i) => it.kind !== 'card' ? '' : `<div class="shop-item ${it.sold ? 'sold' : ''}">${cardImg(it.id, {}, `data-a="buy" data-i="${i}"`)}<span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : it.price + 'g'}</span>${evoHint(it.id)}</div>`).join('')}</div>
     <div class="shop-row">${s.items.map((it, i) => {
-      if (it.kind === 'gem') return `<div class="shop-mini ${it.sold ? 'sold' : ''}" data-a="buy" data-i="${i}">${gemChip(it.id)}<small>${esc(GEMS[it.id].text)}</small><span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : it.price + 'g'}</span></div>`;
+      if (it.kind === 'gem') {
+        const fits = r.deck.some((card) => R.canSocket(card, it.id));
+        return `<button class="shop-mini ${it.sold ? 'sold' : ''}" data-a="buy" data-i="${i}" ${it.sold || !fits || r.gold < it.price ? 'disabled' : ''}>${gemChip(it.id)}<small>${esc(GEMS[it.id].text)}</small><span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : !fits ? 'No compatible socket' : it.price + 'g'}</span></button>`;
+      }
       if (it.kind === 'relic') return `<div class="shop-mini ${it.sold ? 'sold' : ''}" data-a="buy" data-i="${i}"><img src="${glyphURL(RELICS[it.id].icon, 56, '#3a2f48')}"><b>${esc(RELICS[it.id].name)}</b><small>${esc(RELICS[it.id].text)}</small><span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : it.price + 'g'}</span></div>`;
       return '';
     }).join('')}
@@ -413,29 +416,32 @@ SCREENS.shop = () => {
     <div class="row end"><button class="btn primary" data-a="leaveNode">Leave</button></div></div></div>`;
 };
 
+SCREENS.gem = () => {
+  const { node } = G.run;
+  return `${topbar()}<div class="screen scroll center"><div class="panel wide">
+    <h2>Gem Cache</h2><p>${node.gemChoices.length ? 'Choose a gem, then choose a card to socket it into.' : 'Your deck has no compatible empty sockets.'}</p>
+    <div class="shop-row">${node.gemChoices.map((id) => `<button class="shop-mini" data-a="chooseGem" data-id="${id}">${gemChip(id)}<small>${esc(GEMS[id].text)}</small></button>`).join('')}</div>
+    <div class="row end"><button class="btn ghost" data-a="leaveNode">Leave</button></div></div></div>`;
+};
+
 SCREENS.forge = () => {
   const r = G.run; const st = r.node; const evo = R.evoOptions(r); const fuse = R.fuseOptions(r);
-  const tab = st.tab || 'socket';
+  const tab = st.tab === 'fuse' ? 'fuse' : 'evolve';
   const canBore = !st.bored && (r.perks.includes('perk_forgecraft') || r.gold >= 40);
   let body = '';
-  if (tab === 'socket') {
-    body = `<p>Pick a gem, then a card with an empty socket. ${r.gems.length ? '' : '<b>You have no gems.</b> Buy them at shops or win elites.'}</p>
-      <div class="gemlist">${r.gems.map((g, i) => gemChip(g, `data-a="pickGem" data-i="${i}" class="gem ${st.gem === i ? 'sel' : ''}"`)).join('')}</div>
-      ${st.gem != null ? `<div class="deckgrid">${r.deck.filter((c) => c.sockets.includes(null) && (r.gems[st.gem] !== 'evo' || EVO_RECIPES.some((e) => e.base === c.id))).map((c) => instImg(c, `data-a="socketInto" data-uid="${c.uid}"`)).join('') || '<p class="dim">No valid cards. Evo Gems only fit Evo base cards.</p>'}</div>` : ''}
-      <div class="row"><button class="btn" data-a="forgeBore" ${canBore ? '' : 'disabled'}>Bore a socket ${r.perks.includes('perk_forgecraft') ? '(free once)' : '(40g)'}</button></div>`;
-  } else if (tab === 'evolve') {
+  if (tab === 'evolve') {
     body = evo.length ? `<div class="evo-list">${evo.map((o) => `<div class="evo ${o.ready ? 'ready' : ''}">
         ${instImg(r.deck.find((c) => c.uid === o.uid))}<span class="plus">+</span>${cardImg(o.recipe.catalyst, {}, `class="card ${o.catalystUid ? '' : 'missing'}"`)}<span class="plus">=</span>${cardImg(o.recipe.result)}
         <div>${o.hasGem ? '✔ Evo Gem socketed' : '✘ Needs an Evo Gem in an empty socket'}<br>${o.catalystUid ? '✔ Catalyst owned' : '✘ Catalyst not in deck'}<br>
         ${o.ready ? `<button class="btn primary" data-a="evolve" data-uid="${o.uid}">Evolve!</button>` : ''}</div></div>`).join('')}</div>` : '<p class="dim">None of your cards are Evo bases. Bases include: ' + EVO_RECIPES.map((e) => CARDS[e.base].name).join(', ') + '.</p>';
   } else {
-    body = fuse.length ? `<p>Fuse two copies into one upgraded (+) card with an extra socket.</p><div class="evo-list">${fuse.map((f) => `<div class="evo ready">${cardImg(f.id)}<span class="plus">+</span>${cardImg(f.id)}<span class="plus">=</span>${cardImg(f.id, { plus: 1 })}<button class="btn primary" data-a="fuse" data-a1="${f.a}" data-b1="${f.b}">Fuse</button></div>`).join('')}</div>` : '<p class="dim">You need two un-upgraded copies of the same card to fuse.</p>';
+    body = fuse.length ? `<p>Fuse two copies into one upgraded (+) card. Their gems must fit together in the result.</p><div class="evo-list">${fuse.map((f) => `<div class="evo ready">${instImg(r.deck.find((c) => c.uid === f.a))}<span class="plus">+</span>${instImg(r.deck.find((c) => c.uid === f.b))}<span class="plus">=</span>${cardImg(f.id, { plus: 1 })}<button class="btn primary" data-a="fuse" data-a1="${f.a}" data-b1="${f.b}">Fuse</button></div>`).join('')}</div>` : '<p class="dim">Fusion needs two un-upgraded copies with room for their combined gems.</p>';
   }
   return `${topbar()}<div class="screen scroll"><div class="panel wide">
     <h2>The Forge</h2>
-    <div class="tabs">${['socket', 'evolve', 'fuse'].map((t) => `<button class="tab ${tab === t ? 'on' : ''}" data-a="forgeTab" data-t="${t}">${t[0].toUpperCase() + t.slice(1)}${t === 'evolve' && evo.some((o) => o.ready) ? ' ✦' : ''}</button>`).join('')}</div>
+    <div class="tabs">${['evolve', 'fuse'].map((t) => `<button class="tab ${tab === t ? 'on' : ''}" data-a="forgeTab" data-t="${t}">${t[0].toUpperCase() + t.slice(1)}${t === 'evolve' && evo.some((o) => o.ready) ? ' ✦' : ''}</button>`).join('')}</div>
     ${body}
-    <div class="row end"><button class="btn primary" data-a="leaveNode">Leave Forge</button></div></div></div>`;
+    <div class="row end"><button class="btn" data-a="forgeBore" ${canBore ? '' : 'disabled'}>Bore a socket ${r.perks.includes('perk_forgecraft') ? '(free once)' : '(40g)'}</button><button class="btn primary" data-a="leaveNode">Leave Forge</button></div></div></div>`;
 };
 
 const pickerScreen = (title, desc, filter, action, leaveLabel = 'Leave') => () => {
@@ -481,7 +487,7 @@ SCREENS.summary = () => {
   const s = G.summary; const r = s.run;
   return `<div class="screen scroll center"><div class="panel ${s.victory ? 'win' : 'lose'}">
     <h2>${s.victory ? 'The machines fall silent.' : 'Your run ends.'}</h2>
-    <p>${s.victory ? `Victory with ${WARDENS[r.warden].name} at Heat ${r.heat}!` : `Fell in Act ${r.act}.`}</p>
+    <p>${s.victory ? `Victory with ${WARDENS[r.warden].name} at Heat ${r.heat}!` : `Run ended during boss stage ${r.act}.`}</p>
     <div class="stats"><div><b>${r.fightsWon}/${r.fights}</b><small>fights won</small></div><div><b>${r.deck.length}</b><small>cards</small></div><div><b>${r.relics.length}</b><small>relics</small></div><div><b>${r.stats.evolutions}</b><small>evolutions</small></div></div>
     <p class="gains"><span>+${s.shards} ✦ shards</span>${s.bonus ? ` <small>(incl. ${s.bonus} bonus)</small>` : ''}</p>
     <p class="dim">Total shards: ${G.meta.shards}. Spend them in the Archive.</p>
@@ -523,13 +529,12 @@ SCREENS.codex = () => {
 
 // ---------- modals ----------
 function sortDeck(d) { return d.slice().sort((a, b) => cardDef(a.id).cost - cardDef(b.id).cost || cardDef(a.id).name.localeCompare(cardDef(b.id).name)); }
-const KEYWORDS = { reveal: ['On Reveal', 'Triggers once when played.'], ongoing: ['Ongoing', 'Always active while on the board.'], move: ['Move', 'Tap it on the board, then another lane. Once per turn.'], strike: ['Strike', 'The strongest enemy card in that lane gets −N Power.'], freeze: ['Freeze', "Your opponent can't play cards in that lane next turn."], discard: ['Lingering', 'Triggers when discarded from your hand by an effect.'], hold: ['Patience', 'Gets better the longer it waits in your hand.'], junk: ['Junk', 'A 0-Power token that takes up a slot.'], destroy: ['Destroy', 'Destroyed cards go to your discard pile.'], grow: ['Grow', 'Gains power over time.'] };
+const KEYWORDS = { reveal: ['On Reveal', 'Triggers once when played.'], ongoing: ['Ongoing', 'Always active while on the board.'], move: ['Move', 'Tap it on the board, then another lane. Once per turn.'], strike: ['Strike', 'The strongest enemy card in that lane gets −N Power.'], freeze: ['Freeze', "Your opponent can't play cards in that lane next turn."], discard: ['Lingering', 'Triggers when discarded from your hand by an effect.'], junk: ['Junk', 'A 0-Power token that takes up a slot.'], destroy: ['Destroy', 'Destroyed cards go to your discard pile.'], grow: ['Grow', 'Gains power over time.'] };
 function modalHtml() {
   const m = G.modal; const r = G.run;
   let inner = '';
   if (m.type === 'deck') inner = `<h2>Your Deck (${r.deck.length})</h2><div class="deckgrid">${sortDeck(r.deck).map((c) => instImg(c, `data-a="inspectInst" data-uid="${c.uid}"`)).join('')}</div>
-     ${r.home.length ? `<h3>Home</h3><p>${r.home.map((h) => `<b>${esc(HOME_UPGRADES[h].name)}</b>: ${esc(HOME_UPGRADES[h].text)}`).join('<br>')}</p>` : ''}
-     ${r.gems.length ? `<h3>Gems</h3><div class="gemlist">${r.gems.map((g) => gemChip(g)).join('')}</div>` : ''}`;
+     ${r.home.length ? `<h3>Home</h3><p>${r.home.map((h) => `<b>${esc(HOME_UPGRADES[h].name)}</b>: ${esc(HOME_UPGRADES[h].text)}`).join('<br>')}</p>` : ''}`;
   if (m.type === 'inspect') {
     const def = cardDef(m.id);
     const kws = (def.tags || []).filter((t) => KEYWORDS[t]).map((t) => `<p><b>${KEYWORDS[t][0]}</b>: ${KEYWORDS[t][1]}</p>`).join('');
@@ -554,7 +559,7 @@ function modalHtml() {
       <p>You <b>${lane.totals[0]}</b> · Opponent <b>${lane.totals[1]}</b></p>${lane.lock[0] === b.turn ? '<p>❄ Frozen: you can\'t play here this turn.</p>' : ''}`;
   }
   if (m.type === 'relic') { inner = relicCard(m.id); }
-  if (m.type === 'pick') inner = `<h2>${esc(m.title)}</h2><div class="deckgrid">${sortDeck(r.deck).filter(m.filter || (() => true)).map((c) => instImg(c, `data-a="modalPick" data-uid="${c.uid}"`)).join('')}</div>`;
+  if (m.type === 'pick') inner = `<h2>${esc(m.title)}</h2>${m.gem ? `<p>${gemChip(m.gem)} ${esc(GEMS[m.gem].text)}</p>` : ''}<div class="deckgrid">${sortDeck(r.deck).filter(m.filter || (() => true)).map((c) => instImg(c, `data-a="modalPick" data-uid="${c.uid}"`)).join('')}</div>`;
   if (m.type === 'menu') inner = `<h2>Paused</h2><div class="menu-col"><button class="btn" data-a="closeModal">Resume</button><button class="btn" data-a="howtoModal">How to Play</button><button class="btn" data-a="toggleSound">Sound: ${G.meta.settings.sound ? 'On' : 'Off'}</button><button class="btn" data-a="saveQuit">Save & Quit to Title</button><button class="btn bad" data-a="abandon">Abandon Run</button></div>`;
   if (m.type === 'help') inner = `<h2>Battle Basics</h2><div class="prose"><p>Drag a card onto a lane (or tap a card, then tap a lane). Win <b>2 of 3</b> lanes after ${G.battle?.maxTurns || 6} turns.</p><p>Energy = turn number. Played cards stay face-down until <b>End Turn</b>, then both sides reveal. Tap a face-down card to take it back.</p><p>The badges show each side's Power per lane (green = you're winning). Tap a revealed card to inspect or <b>Move</b> it; tap the opponent's portrait to see their info.</p></div>`;
   return `<div class="overlay" data-a="closeModalBg"><div class="panel modal ${m.type}">${inner}<button class="btn closex" data-a="closeModal">✕</button></div></div>`;
@@ -570,10 +575,16 @@ A.pickWarden = (d) => { G.warden = d.id; render(); };
 A.heat = (d) => { G.heat = Math.max(0, Math.min(G.meta.maxHeat, G.heat + +d.d)); render(); };
 A.startRun = () => {
   G.run = R.newRun(G.meta, G.warden, G.heat);
-  G.run.visited = [];
   persist(); G.mapSel = null; go('map');
 };
-A.continue = () => { G.run = loadRun(); if (!G.run) return go('title'); resumeRun(); };
+A.continue = () => {
+  const saved = loadRun();
+  if (!saved) return go('title');
+  G.run = R.migrateRun(saved);
+  G.mapSel = null;
+  persist();
+  resumeRun();
+};
 function resumeRun() {
   const r = G.run;
   if (r.over) return finishRun();
@@ -592,7 +603,6 @@ A.howtoModal = () => go('howto');
 A.closeModal = () => { G.modal = null; render(); };
 A.closeModalBg = (d, el, ev) => { if (ev.target === el) { G.modal = null; render(); } };
 A.relicInfo = (d) => { G.modal = { type: 'relic', id: d.id }; render(); };
-A.showGems = () => { G.modal = { type: 'deck' }; render(); };
 A.inspectDef = (d) => { G.modal = { type: 'inspect', id: d.id }; render(); };
 A.inspectInst = (d) => { const inst = G.run.deck.find((c) => c.uid === d.uid); G.modal = { type: 'inspect', id: inst.id, inst }; render(); };
 A.saveQuit = () => { persist(); G.battle = null; go('title'); };
@@ -600,21 +610,27 @@ A.abandon = () => { if (!confirmAbandon()) return; G.run.over = 'defeat'; finish
 function confirmAbandon() { if (G._abandonArmed) { G._abandonArmed = false; return true; } G._abandonArmed = true; toast('Tap Abandon again to confirm.'); setTimeout(() => (G._abandonArmed = false), 3000); return false; }
 
 // map
-A.mapNode = (d) => { G.mapSel = d.id; sfx.click(); render(); };
-A.enterNode = (d) => { const n = R.nodeById(G.run, d.id); if (!R.availableNodes(G.run).includes(n.id)) return; openNode(n); };
+A.mapNode = (d) => {
+  sfx.click();
+  if (R.availableNodes(G.run).includes(d.id)) return A.enterNode(d);
+  G.mapSel = d.id;
+  render();
+};
+A.enterNode = (d) => openNode(R.nodeById(G.run, d.id));
 window.__openNode = (id) => openNode(R.nodeById(G.run, id));
 function openNode(n, resumed = false) {
   const r = G.run;
-  R.enterNode(r, n.id);
+  if (!n || (!resumed && !R.enterNode(r, n.id))) return;
   if (!r.visited.includes(n.id)) r.visited.push(n.id);
   if (!resumed || !r.node || r.node.id !== n.id) r.node = { id: n.id, type: n.type, done: false };
   const st = r.node;
-  if (n.enc) { startBattle(n); return; }
   if (n.type === 'shop' && !st.shop) st.shop = R.rollShop(r);
+  if (n.type === 'gem' && !st.gemChoices) st.gemChoices = R.rollGemChoices(r);
   if (n.type === 'treasure' && !st.relicRolled) { st.relicRolled = true; st.relic = R.gainRandomRelicId(r); st.gold = 25 + R.rngFor(r).int(0, 25); r.gold += st.gold; }
   if (n.type === 'home' && !st.choices) st.choices = R.homeChoices(r, 3);
   if (n.type === 'event' && !st.event) st.event = R.rollEvent(r);
   persist();
+  if (n.enc) { startBattle(n); return; }
   go(n.type);
 }
 A.leaveNode = () => { const r = G.run; r.node.done = true; G.mapSel = null; persist(); go('map'); };
@@ -672,7 +688,7 @@ function afterReward(msg) {
   if (node.type === 'boss') {
     R.finishAct(r);
     if (r.over) return finishRun();
-    persist(); G.mapSel = null; go('map'); toast(`Act ${r.act} begins.`); return;
+    persist(); G.mapSel = null; go('map'); return;
   }
   persist(); G.mapSel = null; go('map'); if (msg) toast(msg);
 }
@@ -684,11 +700,31 @@ function finishRun() {
 }
 
 // shop
+function chooseGemCard(id, title, apply) {
+  const filter = (card) => R.canSocket(card, id);
+  if (!G.run.deck.some(filter)) { sfx.error(); toast('No compatible empty sockets.'); return; }
+  G.modal = { type: 'pick', title, gem: id, filter, onPick: apply };
+  render();
+}
+
 A.buy = (d) => {
-  const r = G.run; const it = r.node.shop.items[+d.i];
+  const r = G.run; const shop = r.node.shop; const idx = +d.i; const it = shop.items[idx];
   if (!it || it.sold) return;
   if (r.gold < it.price) { sfx.error(); toast('Not enough gold.'); return; }
-  R.buy(r, r.node.shop, +d.i); sfx.coin(); persist(); render();
+  if (it.kind === 'gem') {
+    chooseGemCard(it.id, `Socket ${GEMS[it.id].name} · ${it.price}g`, (uid) => {
+      if (R.buy(r, shop, idx, uid)) { sfx.coin(); persist(); toast('Gem socketed.'); }
+    });
+    return;
+  }
+  if (R.buy(r, shop, idx)) { sfx.coin(); persist(); render(); }
+};
+A.chooseGem = (d) => {
+  const r = G.run;
+  if (r.node.type !== 'gem' || !r.node.gemChoices.includes(d.id)) return;
+  chooseGemCard(d.id, `Socket ${GEMS[d.id].name}`, (uid) => {
+    if (R.claimGem(r, d.id, uid)) { sfx.buff(); A.leaveNode(); toast('Gem socketed.'); }
+  });
 };
 A.shopRemove = () => {
   const r = G.run; const s = r.node.shop; if (s.removeUsed) return;
@@ -700,11 +736,10 @@ A.modalPick = (d) => { const m = G.modal; G.modal = null; m.onPick(d.uid); rende
 
 // forge
 A.forgeTab = (d) => { G.run.node.tab = d.t; render(); };
-A.pickGem = (d) => { G.run.node.gem = +d.i; render(); };
-A.socketInto = (d) => { const r = G.run; if (R.socketGem(r, r.node.gem, d.uid)) { sfx.buff(); r.node.gem = null; persist(); toast('Gem socketed.'); } else toast("That gem doesn't fit there."); };
 A.forgeBore = () => {
   const r = G.run; const free = r.perks.includes('perk_forgecraft');
-  G.modal = { type: 'pick', title: 'Bore a socket into…', filter: (c) => c.sockets.length < 3 && !cardDef(c.id).token, onPick: (uid) => { if (!free) r.gold -= 40; r.node.bored = true; R.boreSocket(r, uid); sfx.buff(); persist(); } };
+  if (r.node.bored || (!free && r.gold < 40)) return;
+  G.modal = { type: 'pick', title: 'Bore a socket into…', filter: (c) => c.sockets.length < 3 && !cardDef(c.id).token, onPick: (uid) => { if (!R.boreSocket(r, uid)) return; if (!free) r.gold -= 40; r.node.bored = true; sfx.buff(); persist(); } };
   render();
 };
 A.evolve = (d) => { const c = R.evolve(G.run, G.meta, d.uid); if (c) { sfx.evolve(); persist(); toast(`Evolved into ${CARDS[c.id].name}!`); } };

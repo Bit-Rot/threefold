@@ -21,8 +21,8 @@ loc('graveyard', 'Old Graveyard', 'When a card is destroyed here, its owner\'s o
 loc('bazaar', 'Bazaar', 'When you play a card here, gain 3 gold.', { bg: 'market', pal: 'gold' }, {
   onPlay(b, lane, bc) { if (bc.lane === lane.idx) b.gold(3); },
 });
-loc('library', 'Sunken Library', 'The first card each player plays here each turn draws them a card.', { bg: 'library', pal: 'ocean' }, {
-  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.revealedHereThisTurn === 0) b.drawCards(1); },
+loc('library', 'Sunken Library', 'Each player’s first card here each turn draws them 1 extra card next turn.', { bg: 'library', pal: 'ocean' }, {
+  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.revealedHereThisTurn === 0) b.drawNextTurn(); },
 });
 loc('storm_peak', 'Storm Peak', 'End of turn: each player Strikes 2 here.', { bg: 'storm', pal: 'storm' }, {
   endTurn(b, lane) { b.strike(lane.idx, 2); },

@@ -481,7 +481,12 @@ const ENEMY_ART = {
   commission: { f: 'hum', hat: 'tophat', item: 'scroll', pal: 'violet', bg: 'library' },
   leech: { f: 'serpent', pal: 'moss', bg: 'swamp' },
   baton: { f: 'hum', hat: 'tophat', item: 'staff', pal: 'shadow', bg: 'temple' },
+  archivist: { f: 'hum', hat: 'scholar', item: 'book', pal: 'bone', bg: 'library' },
+  rust_monarch: { f: 'robot', pal: 'rust', bg: 'castle' },
   brood: { f: 'spider', pal: 'violet', bg: 'cave' },
+  frost_regent: { f: 'hum', hat: 'crown', item: 'staff', pal: 'frost', bg: 'snow' },
+  leviathan: { f: 'serpent', pal: 'gold', bg: 'sea' },
+  furnace_warden: { f: 'ram', pal: 'ember', bg: 'fire' },
   engine: { f: 'factory', pal: 'steel', bg: 'storm', big: true },
   engine_ram: { f: 'ram', pal: 'steel', bg: 'storm' },
 };
@@ -599,6 +604,7 @@ function glyphBody(ctx, key, color = '#ffe27a') {
     case 'elite': glyphBody(ctx, 'skull'); break;
     case 'boss': hat(ctx, 'horns', PAL.bone, 0, 30, 30); ell(ctx, 0, 6, 26, 26); F(g('#c23b3b')); ctx.fillStyle = '#ffe27a'; ell(ctx, -10, 2, 5, 4); ctx.fill(); ell(ctx, 10, 2, 5, 4); ctx.fill(); break;
     case 'shop': glyphBody(ctx, 'coin'); break;
+    case 'gem': poly(ctx, [[0, -42], [29, -12], [21, 30], [0, 42], [-21, 30], [-29, -12]]); F(g('#e58dff')); break;
     case 'forge': poly(ctx, [[-36, 0], [36, 0], [28, 14], [16, 14], [16, 36], [-16, 36], [-16, 14], [-36, 10]]); F(g('#6a6a7a')); ctx.fillStyle = rad(ctx, 0, -18, 2, 26, [[0, '#fff3a0'], [1, 'rgba(255,100,40,0)']]); ell(ctx, 0, -18, 26, 22); ctx.fill(); break;
     case 'purge': glyphBody(ctx, 'flame'); break;
     case 'mirror': ell(ctx, 0, -4, 26, 34); F(lin(ctx, -26, -38, 26, 30, [[0, '#ffffff'], [0.5, '#9fe8ff'], [1, '#2f7fb8']])); poly(ctx, [[-6, 30], [6, 30], [6, 44], [-6, 44]]); F('#d4a53b'); break;

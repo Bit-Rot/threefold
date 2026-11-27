@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sim": "node tools/sim.mjs"
+    "sim": "node tools/sim.mjs",
+    "test": "node --test tools/progression.test.mjs"
   },
   "license": "MIT",
   "dependencies": {

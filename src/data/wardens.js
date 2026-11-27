@@ -26,7 +26,7 @@ export const WARDENS = {
   },
   hexwright: {
     id: 'hexwright', name: 'Vesk', title: 'the Hexwright', color: '#b07dff', unlock: 'warden_hex',
-    text: 'Start each fight with 1 extra card. Whenever you discard a card, Strike 1 in a random lane.',
+    text: 'Start each fight with 1 extra card. Whenever an effect discards one of your cards, Strike 1 in a random lane.',
     deck: ['ember_wisp', 'rag_picker', 'hex_scribe', 'scholar', 'wailing_shade', 'spearman', 'ghost_lantern', 'guardian', 'drummer', 'bonfire_hag', 'hill_ogre', 'stone_giant'],
     relic: 'rag_doll',
     art: { f: 'hum', hat: 'witch', item: 'quill', pal: 'violet', bg: 'library' },
@@ -35,7 +35,7 @@ export const WARDENS = {
   },
   forgemaster: {
     id: 'forgemaster', name: 'Brannoc', title: 'the Forgemaster', color: '#c9c9d6', unlock: 'warden_forge',
-    text: 'Start each run with 2 extra sockets on random cards and an Ember Gem. Your gemmed cards have +1 Power.',
+    text: 'Start each run with 2 extra sockets on random cards. Your gemmed cards have +1 Power.',
     deck: ['recruit', 'clockwork_squire', 'spearman', 'tinker', 'scrap_thrower', 'guardian', 'siegecrafter', 'watchtower', 'catapult', 'hill_ogre', 'bulwark_golem', 'stone_giant'],
     relic: 'whetstone',
     art: { f: 'hum', hat: 'goggles', item: 'hammer', pal: 'steel', bg: 'workshop' },

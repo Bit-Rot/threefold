@@ -57,13 +57,28 @@ opp('elite_patron', 'The Patron', 'Elite', 'commission', 'elite', [2, 3],
   { text: 'Passive: its Ongoing cards have +1 Power.', ongoing(b) { for (const l of b.lanes) l.flags.ongoingBonus += 1; } });
 
 // ---- Bosses ----
-opp('boss_conductor', 'The Conductor', 'Act I Boss', 'baton', 'boss', [1],
+opp('boss_conductor', 'The Conductor', 'Boss 1', 'baton', 'boss', [1],
   ['recruit', 'sprite', 'drummer', 'drummer', 'lantern_keeper', 'war_banner', 'guardian', 'banner_knight', 'hill_ogre', 'grand_choir', 'bulwark_golem', 'stone_giant'],
   { boss: 'conductor' });
-opp('boss_brood', 'Brood Mother', 'Act II Boss', 'brood', 'boss', [2],
+opp('boss_archivist', 'The Pale Archivist', 'Boss 2', 'archivist', 'boss', [2],
+  ['sprite', 'lamplighter', 'hearth_cook', 'scholar', 'twin_blades', 'lantern_keeper', 'oathkeeper', 'hourglass_sage', 'sage_elder', 'time_weaver', 'guardian', 'void_oracle'],
+  { boss: 'archivist' });
+opp('boss_rust', 'The Rust Monarch', 'Boss 3', 'rust_monarch', 'boss', [3],
+  ['clockwork_squire', 'recruit', 'scrap_thrower', 'scrap_thrower', 'tinker', 'watchtower', 'scrap_golem', 'cog_marshal', 'guardian', 'catapult', 'hill_ogre', 'avalanche'],
+  { boss: 'rust' });
+opp('boss_brood', 'Brood Mother', 'Boss 4', 'brood', 'boss', [4],
   ['blink_fox', 'cinder_imp', 'pack_alpha', 'lone_wolf', 'beast_tamer', 'salamander', 'thunder_hawk', 'tide_turtle', 'hill_ogre', 'starlit_unicorn', 'moon_howler', 'elder_dragon'],
   { boss: 'brood' });
-opp('boss_engine', 'The Grand Engine', 'Act III Boss', 'engine', 'boss', [3],
+opp('boss_frost', 'The Frost Regent', 'Boss 5', 'frost_regent', 'boss', [5],
+  ['sprite', 'mossling', 'arbalest', 'spearman', 'wind_dancer', 'frost_witch', 'frost_witch', 'guardian', 'tide_turtle', 'crystal_golem', 'storm_caller', 'avalanche'],
+  { boss: 'frost' });
+opp('boss_leviathan', 'The Gilded Leviathan', 'Boss 6', 'leviathan', 'boss', [6],
+  ['blink_fox', 'cinder_imp', 'recruit', 'golden_hen', 'pack_alpha', 'wind_dancer', 'drummer', 'riptide_siren', 'gale_rider', 'thunder_hawk', 'starlit_unicorn', 'gilded_dragon'],
+  { boss: 'leviathan', style: { ongoing: 2 } });
+opp('boss_furnace', 'The Furnace Warden', 'Boss 7', 'furnace_warden', 'boss', [7],
+  ['ashling', 'cinder_imp', 'arbalest', 'pyre_priest', 'spearman', 'saboteur', 'siegecrafter', 'ballista', 'catapult', 'soulbinder', 'storm_caller', 'doom_trebuchet'],
+  { boss: 'furnace' });
+opp('boss_engine', 'The Grand Engine', 'Boss 8', 'engine', 'boss', [8],
   ['clockwork_squire', 'tinker', 'siegecrafter', 'cog_marshal', 'scrap_golem', 'catapult', 'crystal_golem', 'bulwark_golem', 'avalanche', 'doom_trebuchet', 'mountain_king', 'stone_giant'],
   { boss: 'engine' });
 
@@ -77,13 +92,50 @@ export const BOSSES = {
     canPlay(b) { return b.S[0].playedThisTurn.length >= 2 ? 'The Conductor allows only 2 cards per turn' : null; },
     ongoing(b) { const l = b.flags.cresc; if (l != null) for (const c of b.cardsIn(l, 1)) b.aura(c, 2); },
   },
+  archivist: {
+    name: 'The Pale Archivist',
+    text: 'The first card the Archivist reveals each turn gets +2 Power.',
+    onPlay(b, card) {
+      if (b.flags.archivistTurn === b.turn) return;
+      b.flags.archivistTurn = b.turn;
+      b.buff(card, 2);
+    },
+  },
+  rust: {
+    name: 'The Rust Monarch',
+    text: 'Starts with a Junk card on your side of both outer lanes.',
+    battleStart(b) { for (const lane of [0, 2]) b.spawn('junk', lane, 0, 0); },
+  },
   brood: {
-    id: 'brood', name: 'Brood Mother', act: 2,
+    id: 'brood', name: 'Brood Mother', act: 4,
     text: 'End of every other turn, a 2-Power Broodling hatches in a random lane on her side.',
     endTurn(b) { if (b.turn % 2) return; const lanes = [0, 1, 2].filter((i) => b.freeSlots(i, 1) > 0); if (lanes.length) b.spawn('broodling', b.rng.pick(lanes), 0, 1); },
   },
+  frost: {
+    name: 'The Frost Regent',
+    text: 'On turns 3 and 5, your weakest lane is Frozen.',
+    turnStart(b) {
+      if (b.turn !== 3 && b.turn !== 5) return;
+      b.lanes[b.weakestLane(0)].lock[0] = b.turn;
+    },
+  },
+  leviathan: {
+    name: 'The Gilded Leviathan',
+    text: 'Its cards get +2 Power in lanes where it has at least two cards.',
+    ongoing(b) {
+      for (const lane of b.lanes) {
+        const cards = b.cardsIn(lane.idx);
+        if (cards.length >= 2) for (const card of cards) b.aura(card, 2);
+      }
+    },
+  },
+  furnace: {
+    name: 'The Furnace Warden',
+    text: 'End of turns 2, 4 and 6: Strike 2 in every lane.',
+    endTurn(b) { if (b.turn % 2 === 0) for (const lane of b.lanes) b.strike(lane.idx, 2); },
+  },
   engine: {
-    id: 'engine', name: 'The Grand Engine', act: 3, extraTurns: 1,
+    id: 'engine', name: 'The Grand Engine', act: 8, extraTurns: 1,
     text: 'A 7-turn fight. The Engine gains +1 Energy every turn.',
     turnStart(b) { b.S[1].energy += 1; },
   },
@@ -94,4 +146,4 @@ export const ACT_POOLS = {
   2: { basic: Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(2)).map((o) => o.id), elite: Object.values(O).filter((o) => o.tier === 'elite' && o.acts.includes(2)).map((o) => o.id) },
   3: { basic: Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(3)).map((o) => o.id), elite: Object.values(O).filter((o) => o.tier === 'elite' && o.acts.includes(3)).map((o) => o.id) },
 };
-export const BOSS_BY_ACT = { 1: 'boss_conductor', 2: 'boss_brood', 3: 'boss_engine' };
+export const BOSS_ORDER = ['boss_conductor', 'boss_archivist', 'boss_rust', 'boss_brood', 'boss_frost', 'boss_leviathan', 'boss_furnace', 'boss_engine'];

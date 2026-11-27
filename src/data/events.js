@@ -5,7 +5,7 @@ export const EVENTS = [
     text: 'A soot-stained smith sets down her anvil by the road. "Coin for craft, friend?"',
     choices: [
       { label: 'Pay 40 gold: bore a socket into a random card', can: (r) => r.gold >= 40, apply: (api) => { api.gold(-40); return api.addSocketRandom(); } },
-      { label: 'Take a free Ember Gem', apply: (api) => api.gainGem('ember') },
+      { label: 'Accept a free card upgrade', apply: (api) => api.upgradeRandom(1) },
       { label: 'Leave', apply: () => 'You walk on.' },
     ],
   },
@@ -46,11 +46,11 @@ export const EVENTS = [
     ],
   },
   {
-    id: 'gem_vein', title: 'Glittering Vein', art: { f: 'crystal', pal: 'violet', bg: 'cave' },
-    text: 'A seam of raw gems runs through the cave wall.',
+    id: 'gem_vein', title: 'The Silver Vein', art: { f: 'crystal', pal: 'violet', bg: 'cave' },
+    text: 'Silver threads through the cave wall. The rock crumbles as you approach.',
     choices: [
-      { label: 'Mine carefully: gain a random gem', apply: (api) => api.gainRandomGem() },
-      { label: 'Mine greedily: gain 2 random gems, lose 1 heart', can: (r) => r.hearts > 1, apply: (api) => { api.hearts(-1); return api.gainRandomGem() + ' ' + api.gainRandomGem(); } },
+      { label: 'Mine carefully: gain 25 gold', apply: (api) => { api.gold(25); return 'You collect 25 gold.'; } },
+      { label: 'Mine greedily: gain 65 gold, lose 1 heart', can: (r) => r.hearts > 1, apply: (api) => { api.hearts(-1); api.gold(65); return 'The wall collapses. You escape with 65 gold.'; } },
     ],
   },
   {
@@ -64,9 +64,9 @@ export const EVENTS = [
   },
   {
     id: 'evo_scholar', title: 'The Evolutionist', art: { f: 'hum', hat: 'scholar', item: 'book', pal: 'moss', bg: 'library' },
-    text: '"Everything wants to become something more," the scholar says, producing a pink stone.',
+    text: '"Everything wants to become something more," the scholar says, opening her notebook.',
     choices: [
-      { label: 'Take an Evo Gem (costs 35 gold)', can: (r) => r.gold >= 35, apply: (api) => { api.gold(-35); return api.gainGem('evo'); } },
+      { label: 'Pay 35 gold for 2 card upgrades', can: (r) => r.gold >= 35, apply: (api) => { api.gold(-35); return api.upgradeRandom(2); } },
       { label: 'Ask about recipes (reveals Evo recipes in your deck)', apply: (api) => api.evoHints() },
     ],
   },

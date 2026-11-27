@@ -24,7 +24,7 @@ relic('anchor_stone', 'Anchor Stone', 'common', 'Your 4+ cost cards have +1 Powe
 relic('feather_charm', 'Feather Charm', 'common', 'Cards played on turns 1–2 get +1 Power.', 'feather', {
   onPlay(b, bc) { if (b.turn <= 2) b.buff(bc, 1, true); },
 });
-relic('patience_stone', 'Patience Stone', 'uncommon', 'Cards that spent 2+ turns in your hand cost 1 less.', 'stone', { costMod(b, hc) { return (hc.age || 0) >= 2 ? -1 : 0; } });
+relic('patience_stone', 'Patience Stone', 'uncommon', 'From turn 3 onward, your first card each turn costs 1 less.', 'stone', { costMod(b) { return b.turn >= 3 && !b.playedThisTurn.length ? -1 : 0; } });
 relic('bone_charm', 'Bone Charm', 'uncommon', 'When one of your cards is destroyed, +1 Energy next turn (max 2 per turn).', 'skull', {
   onAnyDestroyed(b, bc) { if (bc.token) return; const k = 'bone' + b.turn; b.flags[k] = (b.flags[k] || 0) + 1; if (b.flags[k] <= 2) b.gainEnergyNext(1); },
 });
@@ -32,14 +32,14 @@ relic('ember_heart', 'Ember Heart', 'common', 'End of turn: Strike 1 in a random
 relic('iron_banner', 'Iron Banner', 'uncommon', 'Your Ongoing cards have +1 Power.', 'banner', {
   ongoing(b) { for (const l of b.lanes) l.flags.ongoingBonus += 1; },
 });
-relic('scroll_case', 'Scroll Case', 'common', 'Start each fight with 2 extra cards in hand.', 'scroll', { startCards: 2 });
-relic('deep_pockets', 'Deep Pockets', 'rare', 'Draw 2 cards each turn instead of 1.', 'bag', { drawBonus: 1, unlock: 'relics_rare' });
+relic('scroll_case', 'Scroll Case', 'common', 'Draw 1 extra card on turn 2.', 'scroll', { turnStart(b) { if (b.turn === 1) b.drawNextTurn(); } });
+relic('deep_pockets', 'Deep Pockets', 'rare', 'Draw 1 extra card each turn.', 'bag', { drawBonus: 1, unlock: 'relics_rare' });
 relic('star_map', 'Star Map', 'uncommon', 'Card rewards offer 4 choices.', 'map', { rewardBonus: 1 });
 relic('ledger', "Merchant's Ledger", 'common', 'Shop prices are 20% lower.', 'book', { shopDiscount: 0.2 });
 relic('ice_shard', 'Ice Shard', 'uncommon', "Turn 1: your opponent can't play cards in a random lane.", 'crystal', { battleStart(b) { b.freeze(b.rng.int(0, 2)); } });
-relic('phoenix_feather', 'Phoenix Feather', 'rare', 'The first card of yours destroyed each fight returns to your hand.', 'feather', {
+relic('phoenix_feather', 'Phoenix Feather', 'rare', 'The first of your cards destroyed each fight returns to next turn’s hand if a bonus slot is free.', 'feather', {
   unlock: 'relics_rare',
-  onAnyDestroyed(b, bc) { if (bc.token || b.flags.pf || !bc.inst || bc.inst.temp) return; b.flags.pf = true; if (b.addToHand(bc.def, bc.inst)) bc.returned = true; },
+  onAnyDestroyed(b, bc) { if (bc.token || b.flags.pf || !bc.inst || bc.inst.temp) return; b.flags.pf = true; if (!bc.returned && b.queueCard(bc.def, bc.inst)) bc.returned = true; },
 });
 relic('tidal_compass', 'Tidal Compass', 'uncommon', 'Once per turn, you may Move any card.', 'compass', { freeMovePerTurn: true, unlock: 'relics_tide' });
 relic('lodestone', 'Lodestone', 'common', 'Whenever one of your cards moves, it gets +1 Power.', 'magnet', { onAnyMove(b, bc) { b.buff(bc, 1); }, unlock: 'relics_tide' });
@@ -48,7 +48,7 @@ relic('home_totem', 'Hearth Totem', 'common', 'Your cards in your Home lane have
 });
 relic('bloodstone', 'Bloodstone', 'rare', '+1 max heart (gained when picked up).', 'heart', { onGain(run) { run.maxHearts++; run.hearts++; } });
 relic('ember_crown', 'Ember Crown', 'rare', 'Start of turn 4: Strike 3 in every lane.', 'crown', { turnStart(b) { if (b.turn === 4) for (let i = 0; i < 3; i++) b.strike(i, 3); } });
-relic('rag_doll', 'Rag Doll', 'uncommon', 'Whenever you discard a card, a random card of yours on the board gets +1.', 'doll', {
+relic('rag_doll', 'Rag Doll', 'uncommon', 'Whenever an effect discards one of your cards, give a random ally on the board +1 Power.', 'doll', {
   unlock: 'relics_hex', onDiscard(b) { const a = b.allCards(); if (a.length) b.buff(b.rng.pick(a), 1, true); },
 });
 relic('echo_shell', 'Echo Shell', 'rare', 'The first On Reveal you play each turn triggers twice.', 'shell', { echoFirstPerTurn: true, unlock: 'relics_rare' });
