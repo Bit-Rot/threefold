@@ -294,6 +294,7 @@ export function applyBattle(run, meta, node, result) {
   (run.earnedAchievements ??= []).push(...out.unlocked);
   if (run.level && enc.kind === 'boss') {
     run.over = result.won ? 'victory' : 'defeat';
+    if (result.won) clearLevel(run, meta);
     return out;
   }
   // reward offer
@@ -456,23 +457,25 @@ export function homeChoices(run, n = 3) {
 }
 
 // ---------- end of run ----------
+function clearLevel(run, meta) {
+  if (run.level !== (meta.levelsCleared ?? 0) + 1) return;
+  meta.levelsCleared = run.level;
+  run.nextLevel = run.level < LEVELS.length ? run.level + 1 : null;
+}
+
 export function endRun(run, meta) {
   const victory = run.over === 'victory';
   const bonus = run.level ? (victory ? 5 : 0) : (victory ? 20 + run.heat * 5 : 0) + (run.act - 1) * 3;
   run.shards += bonus;
   meta.shards += run.shards;
   meta.stats.runs++;
-  let nextLevel = null;
   if (run.level) {
-    if (victory && run.level === (meta.levelsCleared ?? 0) + 1) {
-      meta.levelsCleared = run.level;
-      if (run.level < LEVELS.length) nextLevel = run.level + 1;
-    }
+    if (victory) clearLevel(run, meta);
   } else {
     if (victory) { meta.stats.wins++; meta.maxHeat = Math.max(meta.maxHeat, Math.min(8, run.heat + 1)); }
     meta.stats.bestAct = Math.max(meta.stats.bestAct, run.act);
   }
-  return { victory, shards: run.shards, bonus, nextLevel };
+  return { victory, shards: run.shards, bonus, nextLevel: run.nextLevel ?? null };
 }
 
 export { OPPONENTS, BOSSES };

@@ -239,8 +239,8 @@ test('levels unlock one step at a time after boss wins and leave Heat with the f
     assert.equal(R.startLevel(meta, level.id + 1), null);
     R.applyBattle(run, meta, boss, { won: true, lanesWon: 3, gold: 15 });
     assert.equal(run.over, 'victory');
-    assert.equal(R.endRun(run, meta).nextLevel, level.id === LEVELS.length ? null : level.id + 1);
     assert.equal(meta.levelsCleared, level.id);
+    assert.equal(R.endRun(run, meta).nextLevel, level.id === LEVELS.length ? null : level.id + 1);
     assert.equal(meta.maxHeat, 0);
   }
   assert.ok(R.startLevel(meta, 1));
