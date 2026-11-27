@@ -8,7 +8,6 @@ import { RELICS } from '../data/relics.js';
 import { LOCATIONS } from '../data/locations.js';
 import { HOME_UPGRADES } from '../data/home.js';
 import { OPPONENTS, BOSSES } from '../data/enemies.js';
-import { WARDENS } from '../data/wardens.js';
 import { makeRng } from '../core/rng.js';
 
 export const DRAW_PER_TURN = 5;
@@ -43,7 +42,6 @@ export class Battle {
     this.result = null;
     this.flags = {};
     this.relics = (run.relics || []).map((id) => RELICS[id]).filter(Boolean);
-    this.warden = WARDENS[run.warden] || null;
 
     const self = this;
     this.lanes = [0, 1, 2].map((i) => {
@@ -135,7 +133,6 @@ export class Battle {
       c -= this.nextCostReduction;
       if (this.me === PLAYER) {
         for (const r of this.relics) if (r.costMod) c += r.costMod(this, hc) || 0;
-        if (this.warden?.costMod) c += this.warden.costMod(this, hc) || 0;
       }
       if (laneIdx != null) {
         const lane = this.lanes[laneIdx];
@@ -162,13 +159,12 @@ export class Battle {
   findCard(bid) { for (const l of this.lanes) for (const s of [0, 1]) for (const c of l.slotsBy[s]) if (c && c.bid === bid) return c; return null; }
 
   // ---------- hooks ----------
-  // Run `hook` for every source belonging to `side`: relics/warden/home (player), opponent/boss passive (enemy),
+  // Run `hook` for every source belonging to `side`: relics and Home upgrades (player), opponent and boss (enemy),
   // locations (both sides, under that side's perspective), and that side's revealed cards.
   emitFor(side, hook, ...args) {
     this.as(side, () => {
       if (side === PLAYER) {
         for (const r of this.relics) if (typeof r[hook] === 'function') r[hook](this, ...args);
-        if (this.warden && typeof this.warden[hook] === 'function') this.warden[hook](this, ...args);
         for (const h of this.lanes[1].home) if (typeof h[hook] === 'function') h[hook](this, this.lanes[1], ...args);
       } else {
         if (this.opp && typeof this.opp[hook] === 'function') this.opp[hook](this, ...args);
@@ -190,7 +186,6 @@ export class Battle {
         this.S[side].strikeBonus = 0;
         if (side === PLAYER) {
           for (const r of this.relics) { if (r.ongoing) r.ongoing(this); if (r.strikeBonus) this.S[side].strikeBonus += r.strikeBonus; }
-          if (this.warden?.ongoing) this.warden.ongoing(this);
           for (const h of this.lanes[1].home) if (h.ongoing) h.ongoing(this, this.lanes[1]);
         } else {
           if (this.opp?.ongoing) this.opp.ongoing(this);
@@ -232,9 +227,8 @@ export class Battle {
       let n = DRAW_PER_TURN + S.drawNext;
       S.drawNext = 0;
       if (side === PLAYER) for (const r of this.relics) n += (r.drawBonus || 0) + (this.turn === 1 ? r.startCards || 0 : 0);
-      if (this.turn === 1) {
-        if (side === PLAYER) n += this.warden?.startCards || 0;
-        else n += (this.enc.enemyStartBonus || 0) - this.relics.reduce((sum, r) => sum + (r.enemyStartMinus || 0), 0);
+      if (this.turn === 1 && side === ENEMY) {
+        n += (this.enc.enemyStartBonus || 0) - this.relics.reduce((sum, r) => sum + (r.enemyStartMinus || 0), 0);
       }
       this.as(side, () => this.drawCards(n));
     }
@@ -540,7 +534,6 @@ export class Battle {
       this.as(side, () => {
         if (side === PLAYER) {
           for (const r of this.relics) r.endTurn?.(this);
-          this.warden?.endTurn?.(this);
           for (const h of this.lanes[1].home) h.endTurn?.(this, this.lanes[1]);
         } else { this.opp?.endTurn?.(this); this.boss?.endTurn?.(this); }
         for (const lane of this.lanes) lane.loc?.endTurn?.(this, lane);

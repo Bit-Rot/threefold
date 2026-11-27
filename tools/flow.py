@@ -19,7 +19,7 @@ async def main():
         await pg.wait_for_timeout(2500)
         await pg.screenshot(path=f'shots/{TAG}_title.png')
         await pg.click('[data-a=newRun]'); await pg.wait_for_timeout(400)
-        await pg.screenshot(path=f'shots/{TAG}_wardens.png')
+        await pg.screenshot(path=f'shots/{TAG}_starter_decks.png')
         await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(600)
         await pg.screenshot(path=f'shots/{TAG}_map.png')
         await pg.locator('.node.boss').click()

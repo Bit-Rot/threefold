@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defaultMeta } from '../src/core/save.js';
+import { defaultMeta, loadMeta, saveMeta } from '../src/core/save.js';
 import { CARDS, CARD_LIST, TRIBES } from '../src/data/cards.js';
 import { BOSS_ORDER, OPPONENTS } from '../src/data/enemies.js';
-import { WARDEN_LIST } from '../src/data/wardens.js';
+import { STARTER_DECK_LIST } from '../src/data/starterDecks.js';
 import { Battle, DRAW_PER_TURN, MAX_HAND } from '../src/engine/battle.js';
 import * as R from '../src/engine/run.js';
 
@@ -93,7 +93,7 @@ test('map migration updates unstarted stages and preserves a route already in us
   run.map.rows.shift();
   R.migrateRun(run);
   assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
-  assert.equal(run.v, 5);
+  assert.equal(run.v, 6);
 
   run.v = 2;
   run.map.rows.shift();
@@ -126,7 +126,7 @@ test('every boss has a complete deck and can resolve a battle', () => {
 
 test('Junk cards leave the card catalogue, decks, and existing saved offers', () => {
   assert.ok(CARD_LIST.every((card) => !/\bjunk\b/i.test(card.text)));
-  for (const { deck } of [...WARDEN_LIST, ...Object.values(OPPONENTS)]) {
+  for (const { deck } of Object.values(OPPONENTS)) {
     assert.equal(deck.length, 12);
     assert.ok(deck.every((id) => CARDS[id]));
   }
@@ -157,6 +157,47 @@ test('Junk cards leave the card catalogue, decks, and existing saved offers', ()
   run.node = { type: 'shop', done: false, shop: { items } };
   R.migrateRun(run);
   assert.deepEqual(items, [{ kind: 'card', id: 'slinger', price: 41, sold: false }]);
+});
+
+test('all starter decks can start a fresh run and only change the initial cards', () => {
+  assert.equal(STARTER_DECK_LIST.length, 5);
+  const baseline = newRun();
+  for (const starter of STARTER_DECK_LIST) {
+    const run = R.newRun(defaultMeta(), starter.id, 0, 917);
+    assert.equal(run.starterDeckId, starter.id);
+    assert.equal(starter.cards.length, 12);
+    assert.deepEqual(run.deck.map((card) => card.id), starter.cards);
+    assert.deepEqual(run.relics, []);
+    assert.deepEqual(run.unlocked, baseline.unlocked);
+    assert.deepEqual(run.map, baseline.map);
+    const battle = new Battle(run, encounter, 23);
+    battle.start();
+    assert.equal(battle.hand.length, DRAW_PER_TURN);
+  }
+});
+
+test('former Warden purchases and active runs migrate to starter decks', () => {
+  const meta = defaultMeta();
+  meta.unlocked = ['warden_tide', 'warden_forge', 'gem_echo'];
+  meta.shards = 5;
+  saveMeta(meta);
+  const migrated = loadMeta();
+  assert.equal(migrated.shards, 75);
+  assert.deepEqual(migrated.unlocked, ['gem_echo', 'cache_tide', 'relics_tide', 'locs_tide', 'cache_siege']);
+  assert.deepEqual(loadMeta(), migrated);
+
+  const run = R.newRun(meta, 'tidecaller', 0, 917);
+  run.v = 5;
+  run.warden = run.starterDeckId;
+  delete run.starterDeckId;
+  run.relics = ['lodestone'];
+  run.pos = run.map.rows[0][0].id;
+  run.deck[0].sockets[0] = 'ember';
+  const expected = structuredClone(run);
+  expected.v = 6;
+  expected.starterDeckId = expected.warden;
+  delete expected.warden;
+  assert.deepEqual(R.migrateRun(run), expected);
 });
 
 test('fight rewards spread across energy costs and keep the encounter rarity floor', () => {

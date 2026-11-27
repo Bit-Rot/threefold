@@ -5,8 +5,7 @@ import { RELIC_LIST, RELICS, RELIC_PRICE } from '../data/relics.js';
 import { LOCATION_LIST } from '../data/locations.js';
 import { HOME_LIST } from '../data/home.js';
 import { ACT_POOLS, BOSSES, OPPONENTS, BOSS_ORDER } from '../data/enemies.js';
-import { WARDENS } from '../data/wardens.js';
-import { UNLOCK_MAP } from '../data/meta.js';
+import { STARTER_DECKS } from '../data/starterDecks.js';
 import { makeRng } from '../core/rng.js';
 
 export const ACTS = BOSS_ORDER.length;
@@ -14,12 +13,7 @@ export function regionFor(act) { return Math.min(3, 1 + Math.floor((act - 1) * 3
 
 // ---------- unlocks ----------
 export function unlockedSet(meta) {
-  const s = new Set(['core']);
-  for (const id of meta.unlocked || []) {
-    s.add(id);
-    for (const g of UNLOCK_MAP[id]?.grants || []) s.add(g);
-  }
-  return s;
+  return new Set(['core', ...(meta.unlocked || [])]);
 }
 const open = (set, key) => !key || set.has(key);
 
@@ -47,11 +41,11 @@ const RETIRED_CARDS = {
 };
 
 // ---------- new run ----------
-export function newRun(meta, wardenId, heat = 0, seed) {
+export function newRun(meta, starterDeckId, heat = 0, seed) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
-  const warden = WARDENS[wardenId];
+  const starter = STARTER_DECKS[starterDeckId];
   const run = {
-    v: 5, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
+    v: 6, seed, rngState: seed || 1, starterDeckId, heat, act: 1, nextUid: 1,
     deck: [], relics: [], gold: 60, hearts: 3, maxHearts: 3, home: [],
     map: null, pos: null, visited: [], fightsWon: 0, fights: 0, shards: 0, log: [],
     rerolls: 0, banishes: 0, banished: [], secondWind: {}, removalsBought: 0, over: false,
@@ -59,9 +53,8 @@ export function newRun(meta, wardenId, heat = 0, seed) {
     stats: { evolutions: 0, cardsAdded: 0, removed: 0, bosses: 0 },
   };
   if (heat >= 7) { run.hearts--; run.maxHearts--; }
-  for (const id of warden.deck) run.deck.push(makeInst(run, id));
+  for (const id of starter.cards) run.deck.push(makeInst(run, id));
   if (heat >= 4) run.deck.push(makeInst(run, 'junk'));
-  if (warden.relic) gainRelic(run, warden.relic);
   if (run.perks.includes('perk_reroll')) run.rerolls += 1;
   if (run.perks.includes('perk_reroll2')) run.rerolls += 2;
   if (run.perks.includes('perk_banish')) run.banishes = 2;
@@ -70,7 +63,15 @@ export function newRun(meta, wardenId, heat = 0, seed) {
 }
 
 export function migrateRun(run) {
-  if (![1, 2, 3, 4].includes(run.v)) return run;
+  if (![1, 2, 3, 4, 5].includes(run.v)) return run;
+  if (run.v < 5) migrateNodesAndGems(run);
+  run.starterDeckId = run.starterDeckId ?? run.warden;
+  delete run.warden;
+  run.v = 6;
+  return run;
+}
+
+function migrateNodesAndGems(run) {
   if (run.v === 1) {
     run.gold += (run.gems || []).reduce((sum, id) => sum + (GEMS[id]?.price || 0), 0);
     delete run.gems;
@@ -95,8 +96,6 @@ export function migrateRun(run) {
     reward.kind = nodeById(run, run.pos)?.enc?.kind ?? 'battle';
     reward.cards = rollRewardCards(run, reward.kind, reward.cards.length);
   }
-  run.v = 5;
-  return run;
 }
 
 // ---------- map ----------
@@ -181,9 +180,8 @@ export function cardPool(run) {
 }
 export function relicPool(run) {
   const set = new Set(run.unlocked);
-  return RELIC_LIST.filter((r) => open(set, r.unlock) && !run.relics.includes(r.id) && !WARDEN_RELICS.includes(r.id));
+  return RELIC_LIST.filter((r) => open(set, r.unlock) && !run.relics.includes(r.id));
 }
-const WARDEN_RELICS = [];
 export function gemPool(run) { const set = new Set(run.unlocked); return GEM_LIST.filter((g) => open(set, g.unlock)); }
 
 const RARITIES = ['common', 'uncommon', 'rare', 'legendary'];

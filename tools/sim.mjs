@@ -4,7 +4,7 @@ import * as R from '../src/engine/run.js';
 import { defaultMeta } from '../src/core/save.js';
 import { makeRng } from '../src/core/rng.js';
 import { UNLOCKS } from '../src/data/meta.js';
-import { WARDEN_LIST } from '../src/data/wardens.js';
+import { STARTER_DECK_LIST } from '../src/data/starterDecks.js';
 
 function botTurn(b, rng) {
   let guard = 0;
@@ -23,8 +23,8 @@ function botTurn(b, rng) {
   b.endTurn();
 }
 
-function playRun(wardenId, heat, seed, meta) {
-  const run = R.newRun(meta, wardenId, heat, seed);
+function playRun(starterDeckId, heat, seed, meta) {
+  const run = R.newRun(meta, starterDeckId, heat, seed);
   const rng = makeRng(seed ^ 0x113311);
   const stats = { fights: 0, wins: 0, actReached: 1, byKind: {} };
   while (!run.over) {
@@ -89,11 +89,11 @@ const meta = defaultMeta();
 meta.unlocked = UNLOCKS.map((u) => u.id);
 const total = { runs: 0, victories: 0, byKind: {} };
 const N = Number(process.argv[2] || 30);
-for (let i = 0; i < N; i++) for (const w of WARDEN_LIST) {
-  const r = playRun(w.id, 0, 1000 + i * 13, meta);
+for (let i = 0; i < N; i++) for (const starter of STARTER_DECK_LIST) {
+  const r = playRun(starter.id, 0, 1000 + i * 13, meta);
   total.runs++; if (r.result === 'victory') total.victories++;
   for (const [k, v] of Object.entries(r.byKind)) { (total.byKind[k] ||= { n: 0, w: 0 }); total.byKind[k].n += v.n; total.byKind[k].w += v.w; }
-  if (i === 0) console.log(w.id, r.result, 'act', r.actReached, 'fights', r.fights, 'won', r.wins, '\n   ' + Object.entries(r.byKind).map(([k, v]) => k + ': ' + v.m.slice(0, 3).join(' | ')).join('\n   '));
+  if (i === 0) console.log(starter.id, r.result, 'act', r.actReached, 'fights', r.fights, 'won', r.wins, '\n   ' + Object.entries(r.byKind).map(([k, v]) => k + ': ' + v.m.slice(0, 3).join(' | ')).join('\n   '));
 }
 console.log('runs', total.runs, 'victories', total.victories);
 for (const [k, v] of Object.entries(total.byKind)) console.log(k, 'winrate', (v.w / v.n).toFixed(2), 'n', v.n);

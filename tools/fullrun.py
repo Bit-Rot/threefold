@@ -2,12 +2,12 @@ import sys, asyncio
 from playwright.async_api import async_playwright
 W = int(sys.argv[1]) if len(sys.argv) > 1 else 1280
 H = int(sys.argv[2]) if len(sys.argv) > 2 else 800
-WARDEN = sys.argv[3] if len(sys.argv) > 3 else 'bastion'
-JS = """async (warden) => {
+STARTER_DECK = sys.argv[3] if len(sys.argv) > 3 else 'bastion'
+JS = """async (starterDeck) => {
   const G = window.__G, A = window.__A, R = window.__R;
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  G.meta.unlocked = ['warden_tide','warden_pyre','warden_hex','warden_forge','perk_skip','perk_reroll','perk_scout'];
-  A.newRun(); A.pickWarden({id: warden}); A.startRun();
+  G.meta.unlocked = ['cache_tide','cache_ash','cache_hex','cache_siege','relics_tide','relics_ash','relics_hex','locs_tide','perk_skip','perk_reroll','perk_scout'];
+  A.newRun(); A.pickStarterDeck({id: starterDeck}); A.startRun();
   const seen = new Set(); let steps = 0;
   while (steps++ < 400) {
     await sleep(30);
@@ -50,9 +50,9 @@ async def main():
         pg.on('pageerror', lambda e: logs.append('PAGEERROR: ' + str(e)))
         pg.on('console', lambda m: logs.append(m.text) if m.type == 'error' and '404' not in m.text else None)
         await pg.goto('http://127.0.0.1:5173/'); await pg.evaluate("localStorage.clear()"); await pg.reload(); await pg.wait_for_timeout(1500)
-        res = await pg.evaluate(JS, WARDEN)
+        res = await pg.evaluate(JS, STARTER_DECK)
         print(res)
-        await pg.screenshot(path=f'shots/fullrun_{WARDEN}.png')
+        await pg.screenshot(path=f'shots/fullrun_{STARTER_DECK}.png')
         for l in logs[:20]: print(l)
         await b.close()
 asyncio.run(main())

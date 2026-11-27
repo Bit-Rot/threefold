@@ -8,7 +8,7 @@ import { RELICS, RELIC_LIST } from './data/relics.js';
 import { LOCATIONS, LOCATION_LIST } from './data/locations.js';
 import { HOME_UPGRADES } from './data/home.js';
 import { OPPONENTS, BOSSES } from './data/enemies.js';
-import { WARDENS, WARDEN_LIST } from './data/wardens.js';
+import { STARTER_DECKS, STARTER_DECK_LIST } from './data/starterDecks.js';
 import { UNLOCKS, UNLOCK_MAP, HEAT } from './data/meta.js';
 import { loadMeta, saveMeta, loadRun, saveRun, clearRun } from './core/save.js';
 import { cardURL, instURL, glyphURL, enemyURL, artURL } from './art/cardRender.js';
@@ -19,7 +19,7 @@ import { sfx, setSound } from './audio.js';
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-const G = { meta: loadMeta(), run: null, screen: 'title', battle: null, sel: null, moveSel: null, modal: null, toast: null, archiveTab: 'Warden', codexTab: 'Cards', heat: 0, warden: 'bastion' };
+const G = { meta: loadMeta(), run: null, screen: 'title', battle: null, sel: null, moveSel: null, modal: null, toast: null, archiveTab: 'Cards', codexTab: 'Cards', heat: 0, starterDeckId: 'bastion' };
 window.__G = G;
 
 // ---------------- renderer ----------------
@@ -63,8 +63,10 @@ function go(screen) { G.screen = screen; G.modal = null; render(); }
 function render() {
   const fn = SCREENS[G.screen] || SCREENS.title;
   const wantMode = G.screen === 'battle' ? 'battle' : 'menu';
+  const starterScroll = document.body.dataset.screen === 'starterDecks' && G.screen === 'starterDecks' ? $('.screen')?.scrollTop : null;
   document.body.dataset.screen = G.screen;
   root.innerHTML = fn() + (G.modal ? modalHtml() : '') + (G.toast ? `<div class="toast">${G.toast}</div>` : '');
+  if (starterScroll != null) $('.screen').scrollTop = starterScroll;
   if (wantMode !== mode) { mode = wantMode; }
   layout();
   if (G.screen === 'battle') afterBattleRender();
@@ -97,7 +99,7 @@ SCREENS.title = () => {
     <div class="logo"><span>THREE</span><span class="fold">FOLD</span></div>
     <p class="tagline">Three lanes. Six turns. One run to break the machines.</p>
     <div class="menu-col">
-      ${saved && !saved.over ? `<button class="btn big" data-a="continue">Continue Run <small>Boss ${saved.act}/${R.ACTS} · ${WARDENS[saved.warden]?.name}</small></button>` : ''}
+      ${saved && !saved.over ? `<button class="btn big" data-a="continue">Continue Run <small>Boss ${saved.act}/${R.ACTS} · ${STARTER_DECKS[saved.starterDeckId ?? saved.warden]?.name}</small></button>` : ''}
       <button class="btn big primary" data-a="newRun">New Run</button>
       <button class="btn" data-a="archive">The Archive <small>${G.meta.shards} ✦ shards</small></button>
       <button class="btn" data-a="codex">Codex</button>
@@ -114,30 +116,24 @@ SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <p><b>Turns.</b> Your Energy each turn equals the turn number. Both sides draw up to ${DRAW_PER_TURN} fresh cards each turn, with room for ${MAX_HAND} including bonuses. Unplayed cards go back into circulation. Face-down plays reveal at the end of the turn, starting with whoever leads in more lanes. Tap a face-down card to take it back. The middle lane is your <b>Home</b>.</p>
   <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when an effect discards the card. <b>Junk</b>: 0-Power clutter that fills slots.</p>
   <p><b>The run.</b> Each of the eight stages starts with a battle. Then choose one of two paths with two nodes apiece. Both paths lead to the same boss. Add a card to your deck after each fight. Cards start with one socket. At a Gem node or Shop, choose a compatible card to socket a gem immediately. Fuse nodes combine duplicate cards. Campfires refill your hearts. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
-  <p><b>Gold</b> = the total Power in the lanes you win. <b>Shards</b> are kept between runs; spend them in the Archive on new wardens, card caches, gems, relics, locations and perks.</p>
+  <p><b>Gold</b> = the total Power in the lanes you win. Keep <b>Shards</b> between runs and spend them in the Archive on card caches, gems, relics, locations and perks.</p>
   <p><b>Evolution.</b> Gem nodes and Shops offer an <b>Evo Gem</b> when you have a base card and its catalyst. Choose the pair to evolve the base card immediately. The catalyst is consumed, and the evolved card keeps its sockets and gems.</p>
   <button class="btn primary" data-a="title">Back</button></div></div>`;
 
-SCREENS.wardens = () => {
-  const un = R.unlockedSet(G.meta);
-  return `<div class="screen scroll"><div class="panel wide">
-  <h2>Choose your Warden</h2>
-  <div class="wardens">${WARDEN_LIST.map((w) => {
-    const locked = w.unlock && !un.has(w.unlock);
-    return `<div class="warden ${G.warden === w.id ? 'sel' : ''} ${locked ? 'locked' : ''}" data-a="${locked ? 'archive' : 'pickWarden'}" data-id="${w.id}" style="--wc:${w.color}">
-      <img class="portrait" src="${artURL(w.art, 'warden' + w.id)}">
-      <div><h3>${w.name} <small>${w.title}</small></h3>
-      <p>${esc(w.text)}</p>
-      <p class="dim">Starting relic: ${esc(RELICS[w.relic]?.name || '—')}</p>
-      ${locked ? `<p class="lock">🔒 Unlock in the Archive (${UNLOCK_MAP[w.unlock].cost} ✦)</p>` : ''}</div></div>`;
+SCREENS.starterDecks = () => `<div class="screen scroll"><div class="panel wide">
+  <h2>Choose a starter deck</h2>
+  <div class="starter-decks">${STARTER_DECK_LIST.map((deck) => {
+    const cover = CARDS[deck.cover];
+    return `<button class="starter-deck" aria-pressed="${G.starterDeckId === deck.id}" data-a="pickStarterDeck" data-id="${deck.id}" style="--deck-color:${deck.color}">
+      <img class="portrait" src="${artURL(cover.art, cover.id)}" alt="">
+      <span class="starter-deck-copy"><strong>${esc(deck.name)}</strong><span>${esc(deck.text)}</span></span></button>`;
   }).join('')}</div>
   <div class="heat"><h3>Heat ${G.heat}</h3>
     <div class="row"><button class="btn sm" data-a="heat" data-d="-1" ${G.heat <= 0 ? 'disabled' : ''}>−</button>
     <div class="heat-list">${G.heat ? HEAT.filter((h) => h.lvl <= G.heat).map((h) => `<div>🔥 ${h.text}</div>`).join('') : '<div class="dim">No modifiers. Win a run to unlock Heat.</div>'}</div>
     <button class="btn sm" data-a="heat" data-d="1" ${G.heat >= G.meta.maxHeat ? 'disabled' : ''}>+</button></div></div>
-  <div class="row end"><button class="btn ghost" data-a="title">Back</button><button class="btn big primary" data-a="startRun">Begin Run</button></div>
+  <div class="row end"><button class="btn ghost" data-a="title">Back</button><button class="btn" data-a="previewStarterDeck">View deck</button><button class="btn big primary" data-a="startRun">Begin Run</button></div>
   </div></div>`;
-};
 
 // ---------- map ----------
 SCREENS.map = () => {
@@ -394,8 +390,7 @@ SCREENS.reward = () => {
       ${canSkip ? `<button class="btn ghost" data-a="skipCard">Skip (+10 gold)</button>` : ''}
     </div></div></div>`;
 };
-function evoHint(id) {
-  const deck = G.run?.deck || [];
+function evoHint(id, deck = G.run?.deck || []) {
   const asBase = EVO_RECIPES.find((e) => e.base === id); const asCat = EVO_RECIPES.filter((e) => e.catalyst === id);
   const parts = [];
   if (asBase) parts.push(`Evo base: + ${CARDS[asBase.catalyst].name}${deck.some((c) => c.id === asBase.catalyst) ? ' ✔' : ''}`);
@@ -476,7 +471,7 @@ SCREENS.summary = () => {
   const s = G.summary; const r = s.run;
   return `<div class="screen scroll center"><div class="panel ${s.victory ? 'win' : 'lose'}">
     <h2>${s.victory ? 'The machines fall silent.' : 'Your run ends.'}</h2>
-    <p>${s.victory ? `Victory with ${WARDENS[r.warden].name} at Heat ${r.heat}!` : `Run ended during boss stage ${r.act}.`}</p>
+    <p>${s.victory ? `Victory with ${STARTER_DECKS[r.starterDeckId].name} at Heat ${r.heat}!` : `Run ended during boss stage ${r.act}.`}</p>
     <div class="stats"><div><b>${r.fightsWon}/${r.fights}</b><small>fights won</small></div><div><b>${r.deck.length}</b><small>cards</small></div><div><b>${r.relics.length}</b><small>relics</small></div><div><b>${r.stats.evolutions}</b><small>evolutions</small></div></div>
     <p class="gains"><span>+${s.shards} ✦ shards</span>${s.bonus ? ` <small>(incl. ${s.bonus} bonus)</small>` : ''}</p>
     <p class="dim">Total shards: ${G.meta.shards}. Spend them in the Archive.</p>
@@ -485,15 +480,15 @@ SCREENS.summary = () => {
 
 // ---------- archive ----------
 SCREENS.archive = () => {
-  const m = G.meta; const tabs = ['Warden', 'Cards', 'Gems', 'Relics', 'Locations', 'Perks'];
+  const m = G.meta; const tabs = ['Cards', 'Gems', 'Relics', 'Locations', 'Perks'];
   const list = UNLOCKS.filter((u) => u.kind === G.archiveTab);
-  const owned = new Set(m.unlocked); const grants = R.unlockedSet(m);
+  const owned = R.unlockedSet(m);
   return `<div class="screen scroll"><div class="panel wide">
     <h2>The Archive <span class="shards">${m.shards} ✦</span></h2>
     <p class="dim">Unlocks add new options to future runs; they don't make enemies easier.</p>
     <div class="tabs">${tabs.map((t) => `<button class="tab ${G.archiveTab === t ? 'on' : ''}" data-a="archiveTab" data-t="${t}">${t}</button>`).join('')}</div>
     <div class="unlocks">${list.map((u) => {
-      const have = owned.has(u.id) || grants.has(u.id); const req = u.requires && !owned.has(u.requires) && !grants.has(u.requires);
+      const have = owned.has(u.id); const req = u.requires && !owned.has(u.requires);
       return `<div class="unlock ${have ? 'have' : ''}"><div><b>${esc(u.name)}</b><p>${esc(u.desc)}</p>${req ? `<small class="bad">Requires ${esc(UNLOCK_MAP[u.requires].name)}</small>` : ''}</div>
         ${have ? '<span class="owned">Unlocked</span>' : `<button class="btn ${m.shards >= u.cost && !req ? 'primary' : ''}" data-a="buyUnlock" data-id="${u.id}" ${m.shards < u.cost || req ? 'disabled' : ''}>${u.cost} ✦</button>`}</div>`;
     }).join('')}</div>
@@ -524,10 +519,15 @@ function modalHtml() {
   let inner = '';
   if (m.type === 'deck') inner = `<h2>Your Deck (${r.deck.length})</h2><div class="deckgrid">${sortDeck(r.deck).map((c) => instImg(c, `data-a="inspectInst" data-uid="${c.uid}"`)).join('')}</div>
      ${r.home.length ? `<h3>Home</h3><p>${r.home.map((h) => `<b>${esc(HOME_UPGRADES[h].name)}</b>: ${esc(HOME_UPGRADES[h].text)}`).join('<br>')}</p>` : ''}`;
+  if (m.type === 'starterDeck') {
+    const deck = STARTER_DECKS[G.starterDeckId];
+    inner = `<h2>${esc(deck.name)} (${deck.cards.length} cards)</h2><div class="deckgrid">${deck.cards.map((id) => `<button class="starter-card" data-a="inspectDef" data-id="${id}" data-starter="true">${cardImg(id)}</button>`).join('')}</div>`;
+  }
   if (m.type === 'inspect') {
     const def = cardDef(m.id);
     const kws = (def.tags || []).filter((t) => KEYWORDS[t]).map((t) => `<p><b>${KEYWORDS[t][0]}</b>: ${KEYWORDS[t][1]}</p>`).join('');
-    inner = `<div class="inspect"><img class="card big" src="${m.inst ? instURL(m.inst) : cardURL(m.id)}"><div>${kws}${(m.inst?.sockets || []).filter(Boolean).map((g) => `<p>${gemChip(g)} ${esc(GEMS[g].text)}</p>`).join('')}${evoHint(m.id)}</div></div>`;
+    inner = `<div class="inspect"><img class="card big" src="${m.inst ? instURL(m.inst) : cardURL(m.id)}" alt="${esc(def.name)}"><div>${kws}${(m.inst?.sockets || []).filter(Boolean).map((g) => `<p>${gemChip(g)} ${esc(GEMS[g].text)}</p>`).join('')}${evoHint(m.id, m.fromStarter ? [] : undefined)}</div></div>`;
+    if (m.fromStarter) inner += '<div class="row end"><button class="btn" data-a="previewStarterDeck">Back to deck</button></div>';
   }
   if (m.type === 'boardCard') {
     const b = G.battle; const bc = b.findCard(m.bid);
@@ -566,11 +566,12 @@ const A = {};
 A.title = () => go('title');
 A.howto = () => go('howto');
 A.toggleSound = () => { G.meta.settings.sound = !G.meta.settings.sound; setSound(G.meta.settings.sound); persist(); render(); };
-A.newRun = () => { G.heat = Math.min(G.heat, G.meta.maxHeat); go('wardens'); };
-A.pickWarden = (d) => { G.warden = d.id; render(); };
+A.newRun = () => { G.heat = Math.min(G.heat, G.meta.maxHeat); go('starterDecks'); };
+A.pickStarterDeck = (d) => { G.starterDeckId = d.id; render(); $('.starter-deck[aria-pressed="true"]')?.focus({ preventScroll: true }); };
+A.previewStarterDeck = () => { G.modal = { type: 'starterDeck' }; render(); };
 A.heat = (d) => { G.heat = Math.max(0, Math.min(G.meta.maxHeat, G.heat + +d.d)); render(); };
 A.startRun = () => {
-  G.run = R.newRun(G.meta, G.warden, G.heat);
+  G.run = R.newRun(G.meta, G.starterDeckId, G.heat);
   persist(); G.mapSel = null; go('map');
 };
 A.continue = () => {
@@ -599,7 +600,7 @@ A.howtoModal = () => go('howto');
 A.closeModal = () => { G.modal = null; render(); };
 A.closeModalBg = (d, el, ev) => { if (ev.target === el) { G.modal = null; render(); } };
 A.relicInfo = (d) => { G.modal = { type: 'relic', id: d.id }; render(); };
-A.inspectDef = (d) => { G.modal = { type: 'inspect', id: d.id }; render(); };
+A.inspectDef = (d) => { G.modal = { type: 'inspect', id: d.id, fromStarter: d.starter === 'true' }; render(); };
 A.inspectInst = (d) => { const inst = G.run.deck.find((c) => c.uid === d.uid); G.modal = { type: 'inspect', id: inst.id, inst }; render(); };
 A.saveQuit = () => { persist(); G.battle = null; go('title'); };
 A.abandon = () => { if (!confirmAbandon()) return; G.run.over = 'defeat'; finishRun(); };

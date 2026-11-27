@@ -66,15 +66,14 @@ b { color: #fff; }
 .turn { font-family: var(--serif); font-size: 18px; }
 .turn b { color: var(--gold2); font-size: 22px; }
 
-/* wardens */
-.wardens { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-.warden { display: flex; gap: 10px; padding: 10px; border-radius: 14px; border: 2px solid transparent; background: rgba(0, 0, 0, 0.3); cursor: pointer; text-align: left; }
-.warden.sel { border-color: var(--wc); box-shadow: 0 0 24px color-mix(in srgb, var(--wc) 40%, transparent); }
-.warden.locked { opacity: 0.55; }
-.warden .portrait { width: 96px; height: 96px; border-radius: 12px; border: 2px solid var(--wc); flex-shrink: 0; }
-.warden h3 { margin: 0; color: var(--wc); }
-.warden p { margin: 4px 0; font-size: 14px; }
-.lock { color: var(--gold2); }
+/* starter decks */
+.starter-decks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 10px; }
+.starter-deck { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; border: 2px solid var(--line); background: rgba(0, 0, 0, 0.3); cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.starter-deck[aria-pressed="true"] { border-color: var(--deck-color); box-shadow: 0 0 24px color-mix(in srgb, var(--deck-color) 25%, transparent); }
+.starter-deck .portrait { width: 68px; height: 68px; border-radius: 10px; border: 1px solid var(--deck-color); flex-shrink: 0; }
+.starter-deck-copy { display: grid; gap: 3px; font-size: 14px; }
+.starter-deck-copy strong { color: var(--deck-color); font: 700 20px var(--serif); }
+.starter-card { border: 0; border-radius: 6%; padding: 0; background: transparent; }
 .heat { margin-top: 14px; background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 10px; }
 .heat .row { margin: 0; flex-wrap: nowrap; }
 .heat-list { flex: 1; font-size: 14px; }
