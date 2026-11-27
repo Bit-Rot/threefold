@@ -1,6 +1,6 @@
 # Threefold
 
-A lane-battler roguelite built with Three.js. Both sides draw five fresh cards each turn and play into their own sides of three lanes. Cards reveal at the end of the turn. Before each of eight bosses, choose one of two paths with two nodes apiece. Build your deck during the run and unlock content between runs.
+A lane-battler roguelite built with Three.js. Both sides draw five fresh cards each turn and play into their own sides of three lanes. Cards reveal at the end of the turn. Each of the eight stages starts with a shared battle. Then choose one of two paths with two nodes apiece that lead to the same boss. Build your deck during the run and unlock content between runs.
 
 ## Play
 - `npm install`

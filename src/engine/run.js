@@ -46,7 +46,7 @@ export function newRun(meta, wardenId, heat = 0, seed) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
   const warden = WARDENS[wardenId];
   const run = {
-    v: 2, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
+    v: 3, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
     deck: [], relics: [], gold: 60, hearts: 3, maxHearts: 3, home: [],
     map: null, pos: null, visited: [], fightsWon: 0, fights: 0, shards: 0, log: [],
     rerolls: 0, banishes: 0, banished: [], secondWind: {}, removalsBought: 0, over: false,
@@ -69,13 +69,15 @@ export function newRun(meta, wardenId, heat = 0, seed) {
 }
 
 export function migrateRun(run) {
-  if (run.v !== 1) return run;
-  // Keep installed gems and the current room. Exchange loose gems from old saves for their listed value.
-  run.gold += (run.gems || []).reduce((sum, id) => sum + (GEMS[id]?.price || 0), 0);
-  delete run.gems;
+  if (run.v !== 1 && run.v !== 2) return run;
+  if (run.v === 1) {
+    run.gold += (run.gems || []).reduce((sum, id) => sum + (GEMS[id]?.price || 0), 0);
+    delete run.gems;
+  }
   run.visited ||= [];
+  // Preserve encounters already entered and the choices made on their maps.
   if (!run.pos) run.map = genActMap(run, run.act);
-  run.v = 2;
+  run.v = 3;
   return run;
 }
 
@@ -98,13 +100,14 @@ export const NODE_INFO = {
 
 export function genActMap(run, act) {
   const rng = rngFor(run);
-  const fights = act === 1 ? ['battle', 'battle'] : rng.shuffle(['battle', 'elite']);
-  const services = rng.shuffle(act === 1 ? ['gem', 'shop'] : [rng.pick(['gem', 'shop']), rng.pick(SERVICES)]);
-  const rows = [fights, services, ['boss']];
+  const lastStops = rng.shuffle(act === 1 ? ['gem', 'shop'] : [rng.pick(['gem', 'shop']), rng.pick(SERVICES)]);
+  const firstStops = act === 1 ? rng.shuffle(['home', 'camp']) : rng.sample(SERVICES.filter((type) => !lastStops.includes(type)), 2);
+  const rows = [['battle'], firstStops, lastStops, ['boss']];
   let id = 0;
   const map = { act, rows: rows.map((r, ri) => r.map((type, ci) => ({ id: `a${act}n${id++}`, type, row: ri, col: ci, n: r.length, next: [] }))) };
-  const [entries, stops, [boss]] = map.rows;
-  entries.forEach((node, col) => node.next.push(stops[col].id));
+  const [[battle], branches, stops, [boss]] = map.rows;
+  battle.next.push(...branches.map((node) => node.id));
+  branches.forEach((node, col) => node.next.push(stops[col].id));
   stops.forEach((node) => node.next.push(boss.id));
   // pre-roll encounters so the map can scout them
   for (const row of map.rows) for (const node of row) if (['battle', 'elite', 'boss'].includes(node.type)) node.enc = makeEncounter(run, act, node);

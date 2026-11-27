@@ -80,10 +80,10 @@ b { color: #fff; }
 .heat-list { flex: 1; font-size: 14px; }
 
 /* map */
-.map { display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 30%, rgba(30, 18, 40, 0.3), rgba(8, 6, 14, 0.85)); }
+.map { display: flex; flex-direction: column; overflow-y: auto; background: radial-gradient(ellipse at 50% 30%, rgba(30, 18, 40, 0.3), rgba(8, 6, 14, 0.85)); }
 .maptitle { text-align: center; font-family: var(--serif); color: var(--gold); font-size: 20px; margin: 4px 0; }
 .map-hint { margin: 4px 12px; text-align: center; color: var(--dim); font-size: 13px; }
-.mapwrap { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 0 14px; min-height: 0; }
+.mapwrap { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 0 14px; }
 .maplines { position: absolute; inset: 0; pointer-events: none; }
 .maplines path { fill: none; stroke: rgba(232, 210, 154, 0.25); stroke-width: 3; stroke-dasharray: 6 8; }
 .maplines path.live { stroke: rgba(255, 200, 110, 0.9); stroke-dasharray: none; filter: drop-shadow(0 0 4px rgba(255, 190, 90, 0.8)); }
@@ -100,7 +100,7 @@ b { color: #fff; }
 .node.elite img { border-color: #ff9040; }
 .node.gem img { border-color: #d68dfa; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.6); } 50% { box-shadow: 0 0 0 8px rgba(242, 193, 78, 0); } }
-.preview { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: min(560px, 94vw); background: rgba(20, 14, 30, 0.97); border: 1px solid var(--line); border-radius: 16px; padding: 12px; z-index: 6; text-align: center; }
+.preview { align-self: center; width: min(560px, 100%); background: rgba(20, 14, 30, 0.97); border: 1px solid var(--line); border-radius: 16px; padding: 12px; text-align: center; }
 .preview h3, .preview p { margin: 4px 0; }
 .enc-lanes { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
 .enc-lane { display: flex; flex-direction: column; align-items: center; width: 33%; font-size: 13px; }

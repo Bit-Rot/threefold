@@ -50,28 +50,62 @@ test('reveal draws, queued cards, and relic bonuses work with a fresh hand', () 
   assert.equal(staged.bc.base, 4);
 });
 
-test('routes lock to one lane, reach eight distinct bosses, and finish after the eighth', () => {
+test('a shared battle opens two two-node routes that converge on each of eight bosses', () => {
   const run = newRun();
   const encountered = [];
   for (let act = 1; act <= R.ACTS; act++) {
-    const [starts, stops, bosses] = run.map.rows;
-    assert.deepEqual(run.map.rows.map((row) => row.length), [2, 2, 1]);
+    const [[battle], branches, stops, [boss]] = run.map.rows;
+    assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
+    assert.equal(battle.type, 'battle');
+    assert.equal(boss.type, 'boss');
+    assert.ok([...branches, ...stops].every((node) => !node.enc));
     assert.ok(stops.some((node) => ['gem', 'shop'].includes(node.type)));
     const col = act % 2;
-    assert.deepEqual(R.availableNodes(run), starts.map((node) => node.id));
+    assert.deepEqual(R.availableNodes(run), [battle.id]);
+    assert.equal(R.enterNode(run, branches[col].id), false);
+    assert.equal(R.enterNode(run, battle.id), true);
+    assert.deepEqual(R.availableNodes(run), branches.map((node) => node.id));
+    const alternative = structuredClone(run);
     assert.equal(R.enterNode(run, stops[col].id), false);
-    assert.equal(R.enterNode(run, starts[col].id), true);
+    assert.equal(R.enterNode(run, branches[col].id), true);
     assert.deepEqual(R.availableNodes(run), [stops[col].id]);
+    assert.equal(R.enterNode(run, branches[1 - col].id), false);
     assert.equal(R.enterNode(run, stops[1 - col].id), false);
+    assert.equal(R.enterNode(run, boss.id), false);
     assert.equal(R.enterNode(run, stops[col].id), true);
-    assert.equal(R.enterNode(run, bosses[0].id), true);
-    encountered.push(bosses[0].enc.opponent);
+    assert.deepEqual(R.availableNodes(run), [boss.id]);
+    assert.equal(R.enterNode(run, boss.id), true);
+    assert.equal(R.enterNode(alternative, branches[1 - col].id), true);
+    assert.equal(R.enterNode(alternative, stops[1 - col].id), true);
+    assert.deepEqual(R.availableNodes(alternative), [boss.id]);
+    encountered.push(boss.enc.opponent);
     R.finishAct(run);
     assert.equal(run.over, act === R.ACTS ? 'victory' : false);
   }
   assert.equal(encountered.length, 8);
   assert.deepEqual(encountered, BOSS_ORDER);
   assert.equal(new Set(encountered).size, 8);
+});
+
+test('map migration updates unstarted stages and preserves a route already in use', () => {
+  const run = newRun();
+  run.v = 2;
+  run.map.rows.shift();
+  R.migrateRun(run);
+  assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
+  assert.equal(run.v, 3);
+
+  run.v = 2;
+  run.map.rows.shift();
+  const [entry] = run.map.rows[0];
+  run.pos = entry.id;
+  run.node = { id: entry.id, type: entry.type, done: false };
+  R.migrateRun(run);
+  assert.equal(run.pos, entry.id);
+  assert.equal(run.node.done, false);
+  assert.deepEqual(run.map.rows.map((row) => row.length), [2, 2, 1]);
+  R.finishAct(run);
+  assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
 });
 
 test('every boss has a complete deck and can resolve a battle', () => {

@@ -113,7 +113,7 @@ SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <p><b>Fights.</b> You and an opponent each play cards with <b>Power</b> into your own side of three lanes. After 6 turns, whoever has more Power in a lane wins it. <b>Win 2 of 3 lanes to win the fight</b> (if lanes are tied, total Power decides).</p>
   <p><b>Turns.</b> Your Energy each turn equals the turn number. Both sides draw up to ${DRAW_PER_TURN} fresh cards each turn, with room for ${MAX_HAND} including bonuses. Unplayed cards go back into circulation. Face-down plays reveal at the end of the turn, starting with whoever leads in more lanes. Tap a face-down card to take it back. The middle lane is your <b>Home</b>.</p>
   <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when an effect discards the card. <b>Junk</b>: 0-Power clutter that fills slots.</p>
-  <p><b>The run.</b> Before each of eight bosses, choose one of two paths with two nodes apiece. Add a card to your deck after each fight. At a Gem node or Shop, choose a compatible card to socket the gem immediately. Forges bore empty sockets, evolve cards, and fuse duplicates. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
+  <p><b>The run.</b> Each of the eight stages starts with a battle. Then choose one of two paths with two nodes apiece. Both paths lead to the same boss. Add a card to your deck after each fight. At a Gem node or Shop, choose a compatible card to socket the gem immediately. Forges bore empty sockets, evolve cards, and fuse duplicates. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
   <p><b>Gold</b> = the total Power in the lanes you win. <b>Shards</b> are kept between runs; spend them in the Archive on new wardens, card caches, gems, relics, locations and perks.</p>
   <p><b>Evolution.</b> Apply an <b>Evo Gem</b> to an Evo base card at a Gem node or Shop. Bring that card and its catalyst to a Forge to evolve the base and consume the catalyst.</p>
   <button class="btn primary" data-a="title">Back</button></div></div>`;
@@ -145,6 +145,7 @@ SCREENS.map = () => {
   const rows = r.map.rows.slice().reverse();
   const scout = r.perks.includes('perk_scout');
   const sel = G.mapSel ? R.nodeById(r, G.mapSel) : null;
+  const hint = avail.length > 1 ? 'Choose a path by selecting a highlighted node.' : !r.pos ? 'Start at the highlighted battle.' : '';
   const nodeHtml = (n) => {
     const can = avail.includes(n.id);
     const done = r.visited?.includes(n.id);
@@ -160,7 +161,7 @@ SCREENS.map = () => {
   }
   return `${topbar()}<div class="screen map">
     <div class="maptitle">Boss ${r.act} of ${R.ACTS} · ${esc(OPPONENTS[rows[0][0].enc.opponent].name)}</div>
-    ${!r.pos ? '<p class="map-hint">Choose a path by selecting one of the highlighted nodes.</p>' : ''}
+    ${hint ? `<p class="map-hint">${hint}</p>` : ''}
     <div class="mapwrap"><svg class="maplines" id="maplines"></svg>
     ${rows.map((row) => `<div class="maprow">${row.map(nodeHtml).join('')}</div>`).join('')}</div>
     ${preview}
@@ -174,6 +175,8 @@ function encPreview(enc, showLocs) {
 function drawMapLines() {
   const svg = $('#maplines'); if (!svg || !G.run) return;
   const wrap = svg.parentElement; const wr = wrap.getBoundingClientRect();
+  const visited = new Set(G.run.visited);
+  const available = new Set(R.availableNodes(G.run));
   svg.setAttribute('width', wr.width); svg.setAttribute('height', wr.height);
   let html = '';
   for (const row of G.run.map.rows) for (const n of row) {
@@ -183,7 +186,7 @@ function drawMapLines() {
       const b = wrap.querySelector(`[data-id="${id}"]`); if (!b) continue;
       const br = b.getBoundingClientRect();
       const x1 = ar.left + ar.width / 2 - wr.left, y1 = ar.top + ar.height / 2 - wr.top, x2 = br.left + br.width / 2 - wr.left, y2 = br.top + br.height / 2 - wr.top;
-      const live = G.run.visited.includes(n.id) || (!G.run.pos && n.row === 0);
+      const live = visited.has(n.id) && (visited.has(id) || available.has(id));
       html += `<path d="M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}" class="${live ? 'live' : ''}"/>`;
     }
   }
