@@ -69,6 +69,7 @@ function render() {
   if (wantMode !== mode) { mode = wantMode; }
   layout();
   if (G.screen === 'battle') afterBattleRender();
+  if (G.screen === 'map') revealMapOption();
 }
 function toast(msg) { G.toast = msg; render(); clearTimeout(toast.t); toast.t = setTimeout(() => { G.toast = null; const t = $('.toast'); if (t) t.remove(); }, 2200); }
 
@@ -155,22 +156,27 @@ SCREENS.map = () => {
   let preview = '';
   if (sel) {
     const showEnc = sel.enc && (scout || avail.includes(sel.id));
-    preview = `<div class="preview"><h3>${R.NODE_INFO[sel.type].name}</h3><p>${R.NODE_INFO[sel.type].desc}</p>
+    preview = `<section class="preview" aria-label="Node details"><div class="preview-body">
+      <h3>${R.NODE_INFO[sel.type].name}</h3><p>${R.NODE_INFO[sel.type].desc}</p>
       ${sel.enc ? (showEnc ? encPreview(sel.enc, scout) : '<p class="dim">Unknown foes. (Scouting reveals distant fights.)</p>') : ''}
-      <p class="dim">Not reachable yet.</p></div>`;
+      <p class="dim">Not reachable yet.</p></div>
+      <button class="btn sm ghost preview-close" data-a="closeMapPreview" aria-label="Close node details">✕</button></section>`;
   }
   return `${topbar()}<div class="screen map">
     <div class="maptitle">Boss ${r.act} of ${R.ACTS} · ${esc(OPPONENTS[rows[0][0].enc.opponent].name)}</div>
     ${hint ? `<p class="map-hint">${hint}</p>` : ''}
-    <div class="mapwrap"><svg class="maplines" id="maplines"></svg>
-    ${rows.map((row) => `<div class="maprow">${row.map(nodeHtml).join('')}</div>`).join('')}</div>
     ${preview}
+    <div class="map-viewport"><div class="mapwrap"><svg class="maplines" id="maplines"></svg>
+    ${rows.map((row) => `<div class="maprow">${row.map(nodeHtml).join('')}</div>`).join('')}</div></div>
   </div>`;
 };
 function encPreview(enc, showLocs) {
   const o = OPPONENTS[enc.opponent]; const boss = o.boss ? BOSSES[o.boss] : null;
   return `<div class="enc"><div class="opp-row"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${esc(o.title)}</small><p>${esc(boss ? boss.text : o.text || '')}</p></div></div>
     ${showLocs ? `<p class="dim">Locations: ${esc(LOCATIONS[enc.locs[0]]?.name)} · Home · ${esc(LOCATIONS[enc.locs[2]]?.name)}</p>` : ''}</div>`;
+}
+function revealMapOption() {
+  $('.map-viewport .node.avail')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 function drawMapLines() {
   const svg = $('#maplines'); if (!svg || !G.run) return;
@@ -616,8 +622,13 @@ function confirmAbandon() { if (G._abandonArmed) { G._abandonArmed = false; retu
 A.mapNode = (d) => {
   sfx.click();
   if (R.availableNodes(G.run).includes(d.id)) return A.enterNode(d);
-  G.mapSel = d.id;
+  G.mapSel = G.mapSel === d.id ? null : d.id;
   render();
+};
+A.closeMapPreview = () => {
+  G.mapSel = null;
+  render();
+  $('.map-viewport .node.avail')?.focus({ preventScroll: true });
 };
 A.enterNode = (d) => openNode(R.nodeById(G.run, d.id));
 window.__openNode = (id) => openNode(R.nodeById(G.run, id));
@@ -772,7 +783,11 @@ root.addEventListener('click', (e) => {
 // after each render: map lines
 const mo = new MutationObserver(() => { if (G.screen === 'map') requestAnimationFrame(drawMapLines); });
 mo.observe(root, { childList: true });
-window.addEventListener('resize', () => { if (G.screen === 'map') drawMapLines(); });
+window.addEventListener('resize', () => {
+  if (G.screen !== 'map') return;
+  revealMapOption();
+  drawMapLines();
+});
 
 window.__A = A; window.__R = R;
 export function boot() {

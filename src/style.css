@@ -80,14 +80,15 @@ b { color: #fff; }
 .heat-list { flex: 1; font-size: 14px; }
 
 /* map */
-.map { display: flex; flex-direction: column; overflow-y: auto; background: radial-gradient(ellipse at 50% 30%, rgba(30, 18, 40, 0.3), rgba(8, 6, 14, 0.85)); }
+.map { display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(ellipse at 50% 30%, rgba(30, 18, 40, 0.3), rgba(8, 6, 14, 0.85)); }
 .maptitle { text-align: center; font-family: var(--serif); color: var(--gold); font-size: 20px; margin: 4px 0; }
 .map-hint { margin: 4px 12px; text-align: center; color: var(--dim); font-size: 13px; }
-.mapwrap { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 0 14px; }
+.map-viewport { flex: 1; min-height: 0; overflow-y: auto; }
+.mapwrap { position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 100%; padding: 10px 0 14px; }
 .maplines { position: absolute; inset: 0; pointer-events: none; }
 .maplines path { fill: none; stroke: rgba(232, 210, 154, 0.25); stroke-width: 3; stroke-dasharray: 6 8; }
 .maplines path.live { stroke: rgba(255, 200, 110, 0.9); stroke-dasharray: none; filter: drop-shadow(0 0 4px rgba(255, 190, 90, 0.8)); }
-.maprow { position: relative; height: 84px; }
+.maprow { position: relative; flex: none; height: 84px; }
 .node { position: absolute; left: calc(var(--x) * 100%); top: 50%; transform: translate(-50%, -50%); width: 74px; height: 80px; border: none; background: none; color: var(--text); display: flex; flex-direction: column; align-items: center; cursor: pointer; opacity: 0.5; font-family: var(--sans); }
 .node img { width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle, #3a2f48, #120c18); border: 2px solid var(--line); padding: 4px; }
 .node span { font-size: 11px; color: var(--dim); white-space: nowrap; }
@@ -100,7 +101,13 @@ b { color: #fff; }
 .node.elite img { border-color: #ff9040; }
 .node.gem img { border-color: #d68dfa; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.6); } 50% { box-shadow: 0 0 0 8px rgba(242, 193, 78, 0); } }
-.preview { align-self: center; width: min(560px, 100%); background: rgba(20, 14, 30, 0.97); border: 1px solid var(--line); border-radius: 16px; padding: 12px; text-align: center; }
+.preview {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: none; align-self: center;
+  width: min(560px, 100%); max-height: min(160px, 28svh); overflow: hidden;
+  background: rgba(20, 14, 30, 0.97); border: 1px solid var(--line); border-radius: 16px;
+}
+.preview-body { min-height: 0; overflow-y: auto; padding: 8px 10px; }
+.preview-close { align-self: start; min-width: 34px; min-height: 34px; padding: 6px; margin: 4px; }
 .preview h3, .preview p { margin: 4px 0; }
 .enc-lanes { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
 .enc-lane { display: flex; flex-direction: column; align-items: center; width: 33%; font-size: 13px; }

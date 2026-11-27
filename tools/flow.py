@@ -22,7 +22,15 @@ async def main():
         await pg.screenshot(path=f'shots/{TAG}_wardens.png')
         await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(600)
         await pg.screenshot(path=f'shots/{TAG}_map.png')
-        await pg.locator('.node.avail').first.click(); await pg.wait_for_timeout(1500)
+        await pg.locator('.node.boss').click()
+        await pg.get_by_role('region', name='Node details').wait_for()
+        battle = await pg.locator('.node.battle.avail').evaluate("""node => {
+            const rect = node.getBoundingClientRect();
+            const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+            return { x, y, reachable: node.contains(document.elementFromPoint(x, y)) };
+        }""")
+        assert battle['reachable'], 'The opening battle must be reachable while a node preview is open'
+        await pg.mouse.click(battle['x'], battle['y']); await pg.wait_for_timeout(1500)
         await pg.screenshot(path=f'shots/{TAG}_battle0.png')
         for turn in range(6):
             # play cards by tapping hand card then lane center
