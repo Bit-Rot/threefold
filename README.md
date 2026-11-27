@@ -13,9 +13,9 @@ Push to `main`. The workflow in `.github/workflows/deploy.yml` builds and publis
 In the repo settings, set **Pages → Source** to **GitHub Actions** once.
 
 ## Content
-- 66 cards + 12 evolutions (base + catalyst + Evo Gem), 6 tribes
-- 5 wardens, 46 relics, 11 gems, 21 locations, 15 Home-lane upgrades
-- 10 enemy machine types, 3 rule-breaking bosses, 12 events
+- 87 cards + 12 evolutions (base + catalyst + Evo Gem), 6 tribes
+- 5 wardens, 44 relics, 11 gems, 21 locations, 15 Home-lane upgrades
+- 11 enemy machine types, 3 rule-breaking bosses, 12 events
 - Meta progression (the Archive) with 31 unlocks and 8 Heat levels
 - All art is procedurally painted at runtime (`src/art/painter.js`) — no image assets.
 
