@@ -17,7 +17,9 @@ In the repo settings, set **Pages → Source** to **GitHub Actions** once.
 - 90 cards + 12 evolutions (base + catalyst + Evo Gem), 6 tribes
 - 5 available starter decks, 44 relics, 11 gems, 21 locations, 15 Home-lane upgrades
 - 11 regular opponents and 8 bosses with distinct rules
-- Meta progression through the Archive and 8 Heat levels
+- 24 replayable levels unlocked in order by beating their bosses, alongside the eight-boss run
+- 74 achievement unlocks, including 49 individual cards, and 8 Heat tiers for full runs
+- Main-menu Perk Shop for permanent skips, rerolls, banishes and scouting
 - All art is procedurally painted at runtime (`src/art/painter.js`) — no image assets.
 
 Cards start with one socket. Gem nodes and shops socket gems directly into a compatible card and offer Evo Gems only when you have a base card and its catalyst. The Evo Gem and catalyst are spent as soon as you confirm the evolution. Fuse nodes combine duplicate cards, and Campfires refill your hearts.

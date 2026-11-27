@@ -15,13 +15,13 @@ async def main():
         await pg.goto(URL); await pg.evaluate("localStorage.clear()"); await pg.reload(); await pg.wait_for_timeout(2000)
         # give lots of shards + unlock all, start a run
         await pg.evaluate("""() => { const G = window.__G; G.meta.shards = 999; }""")
-        await pg.click('[data-a=archive]'); await pg.wait_for_timeout(300)
-        await pg.screenshot(path=f'shots/{TAG}_archive.png')
-        await pg.evaluate("""() => { const G = window.__G; G.meta.unlocked = ['cache_tide','cache_ash','cache_hex','cache_siege','relics_tide','relics_ash','relics_hex','locs_tide','cache_patience','cache_tribes','cache_gold','cache_crowns','gem_echo','gem_bulwark','gem_drift','perk_scout','perk_reroll','perk_skip','perk_banish','relics_rare','relics_tribes','locs_mystic']; G.meta.maxHeat = 3; }""")
-        await pg.click('[data-a=title]'); await pg.click('[data-a=newRun]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-a=perkShop]'); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f'shots/{TAG}_perk_shop.png')
+        await pg.evaluate("""() => { const G = window.__G; G.meta.unlocked = ['card_blink_fox','card_ballista','card_merchant','relic_tidal_compass','location_riverbank','gem_echo','gem_bulwark','gem_drift','perk_scout','perk_reroll','perk_skip','perk_banish']; G.meta.maxHeat = 3; }""")
+        await pg.click('[data-a=title]'); await pg.click('[data-a=characters]'); await pg.wait_for_timeout(300)
         await pg.click('[data-a=pickStarterDeck][data-id=tidecaller]'); await pg.click('[data-a=heat][data-d="1"]'); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'shots/{TAG}_starter_decks.png')
-        await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(400)
+        await pg.click('[data-a=title]'); await pg.click('[data-a=newRun]'); await pg.wait_for_timeout(400)
         await pg.evaluate("""() => { const G = window.__G; G.run.gold = 500; G.run.deck.push(window.__R.makeInst(G.run,'slinger'), window.__R.makeInst(G.run,'ballista')); }""")
         for t in ['shop', 'gem', 'forge', 'home', 'camp', 'treasure', 'purge', 'mirror']:
             await pg.evaluate("""(t) => { const r = window.__G.run; const n = r.map.rows[1][0]; n.type = t; r.pos = r.map.rows[0][0].id; r.node = null; window.__openNode(n.id); }""", t)

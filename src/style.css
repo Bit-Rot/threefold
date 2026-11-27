@@ -27,9 +27,12 @@ b { color: #fff; }
 .screen.center { display: grid; place-items: center; text-align: center; }
 .screen.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 40px; }
 .topbar + .screen { top: 52px; }
-.title { background: radial-gradient(ellipse at center, rgba(11, 8, 20, 0.15), rgba(11, 8, 20, 0.75)); }
-.title .foot { position: absolute; bottom: 14px; left: 0; right: 0; color: var(--dim); font-size: 13px; }
+.title { display: flex; flex-direction: column; align-items: center; text-align: center; background: radial-gradient(ellipse at center, rgba(11, 8, 20, 0.15), rgba(11, 8, 20, 0.75)); }
+.title .logo { margin-top: auto; }
+.title .foot { margin: 16px 0 auto; color: var(--dim); font-size: 13px; }
 .menu-col { display: flex; flex-direction: column; gap: 10px; width: min(360px, 88vw); margin: 0 auto; }
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.menu-grid .btn { justify-content: center; }
 
 .panel { background: linear-gradient(180deg, rgba(36, 27, 49, 0.96), rgba(22, 17, 31, 0.97)); border: 1px solid var(--line); border-radius: 18px; padding: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06); max-width: 720px; margin: 10px auto; position: relative; }
 .panel.wide { max-width: 1100px; }
@@ -74,6 +77,11 @@ b { color: #fff; }
 .starter-deck-copy { display: grid; gap: 3px; font-size: 14px; }
 .starter-deck-copy strong { color: var(--deck-color); font: 700 20px var(--serif); }
 .starter-card { border: 0; border-radius: 6%; padding: 0; background: transparent; }
+.levels-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(124px, 100%), 1fr)); gap: 10px; }
+.level { padding-inline: 8px; }
+.level span { font-size: 13px; }
+.achievement-status { display: grid; justify-items: end; gap: 6px; }
+.achievement-rewards { color: var(--gold); }
 .heat { margin-top: 14px; background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 10px; }
 .heat .row { margin: 0; flex-wrap: nowrap; }
 .heat-list { flex: 1; font-size: 14px; }

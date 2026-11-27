@@ -6,6 +6,8 @@ import { LOCATION_LIST } from '../data/locations.js';
 import { HOME_LIST } from '../data/home.js';
 import { ACT_POOLS, BOSSES, OPPONENTS, BOSS_ORDER } from '../data/enemies.js';
 import { STARTER_DECKS } from '../data/starterDecks.js';
+import { cardUnlock, relicUnlock, locationUnlock, expandLegacyUnlocks, recordProgress } from '../data/achievements.js';
+import { LEVELS, levelAvailable } from '../data/levels.js';
 import { makeRng } from '../core/rng.js';
 
 export const ACTS = BOSS_ORDER.length;
@@ -42,15 +44,24 @@ const RETIRED_CARDS = {
 
 // ---------- new run ----------
 export function newRun(meta, starterDeckId, heat = 0, seed) {
+  return beginRun(meta, starterDeckId, heat, seed);
+}
+
+export function startLevel(meta, level, starterDeckId = meta.starterDeckId, seed) {
+  if (!levelAvailable(meta, level)) return null;
+  return beginRun(meta, starterDeckId, 0, seed, LEVELS[level - 1]);
+}
+
+function beginRun(meta, starterDeckId, heat, seed, level) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
   const starter = STARTER_DECKS[starterDeckId];
   const run = {
-    v: 6, seed, rngState: seed || 1, starterDeckId, heat, act: 1, nextUid: 1,
+    v: 7, seed, rngState: seed || 1, starterDeckId, heat, act: level?.stage ?? 1, level: level?.id ?? null, nextUid: 1,
     deck: [], relics: [], gold: 60, hearts: 3, maxHearts: 3, home: [],
     map: null, pos: null, visited: [], fightsWon: 0, fights: 0, shards: 0, log: [],
     rerolls: 0, banishes: 0, banished: [], secondWind: {}, removalsBought: 0, over: false,
     unlocked: [...unlockedSet(meta)], perks: [...(meta.unlocked || [])].filter((u) => u.startsWith('perk_')),
-    stats: { evolutions: 0, cardsAdded: 0, removed: 0, bosses: 0 },
+    stats: { evolutions: 0, cardsAdded: 0, removed: 0, bosses: 0 }, earnedAchievements: [],
   };
   if (heat >= 7) { run.hearts--; run.maxHearts--; }
   for (const id of starter.cards) run.deck.push(makeInst(run, id));
@@ -58,16 +69,19 @@ export function newRun(meta, starterDeckId, heat = 0, seed) {
   if (run.perks.includes('perk_reroll')) run.rerolls += 1;
   if (run.perks.includes('perk_reroll2')) run.rerolls += 2;
   if (run.perks.includes('perk_banish')) run.banishes = 2;
-  run.map = genActMap(run, 1);
+  run.map = genActMap(run, run.act);
   return run;
 }
 
 export function migrateRun(run) {
-  if (![1, 2, 3, 4, 5].includes(run.v)) return run;
+  if (![1, 2, 3, 4, 5, 6].includes(run.v)) return run;
   if (run.v < 5) migrateNodesAndGems(run);
   run.starterDeckId = run.starterDeckId ?? run.warden;
   delete run.warden;
-  run.v = 6;
+  run.unlocked = expandLegacyUnlocks(run.unlocked);
+  run.level = null;
+  run.earnedAchievements ??= [];
+  run.v = 7;
   return run;
 }
 
@@ -135,8 +149,9 @@ function migrateRemovedNodes(run) {
 
 export function genActMap(run, act) {
   const rng = rngFor(run);
-  const lastStops = rng.shuffle(act === 1 ? ['gem', 'shop'] : [rng.pick(['gem', 'shop']), rng.pick(SERVICES)]);
-  const firstStops = act === 1 ? rng.shuffle(['home', 'camp']) : rng.sample(SERVICES.filter((type) => !lastStops.includes(type)), 2);
+  const opening = (run.level ?? act) === 1;
+  const lastStops = rng.shuffle(opening ? ['gem', 'shop'] : [rng.pick(['gem', 'shop']), rng.pick(SERVICES)]);
+  const firstStops = opening ? rng.shuffle(['home', 'camp']) : rng.sample(SERVICES.filter((type) => !lastStops.includes(type)), 2);
   const rows = [['battle'], firstStops, lastStops, ['boss']];
   let id = 0;
   const map = { act, rows: rows.map((r, ri) => r.map((type, ci) => ({ id: `a${act}n${id++}`, type, row: ri, col: ci, n: r.length, next: [] }))) };
@@ -161,26 +176,27 @@ export function makeEncounter(run, act, node) {
   const region = regionFor(act);
   const pools = ACT_POOLS[region];
   const set = new Set(run.unlocked);
-  const locs = LOCATION_LIST.filter((l) => open(set, l.unlock) && l.id !== 'open_field');
+  const locs = LOCATION_LIST.filter((l) => open(set, locationUnlock(l)) && l.id !== 'open_field');
   const two = rng.sample(locs, 2);
   const locIds = [two[0].id, null, rng.chance(0.12) ? 'open_field' : two[1].id];
-  const bonus = Math.max(0, region - 2) + (run.heat >= 8 ? 1 : 0);
+  const level = LEVELS[run.level - 1];
+  const bonus = level?.extraPower ?? (Math.max(0, region - 2) + (run.heat >= 8 ? 1 : 0));
   const enemyStartBonus = run.heat >= 1 ? 1 : 0;
-  if (node.type === 'boss') return { kind: 'boss', opponent: BOSS_ORDER[act - 1], locs: locIds, bonus: bonus + (run.heat >= 5 ? 1 : 0), plus: region >= 2, enemyStartBonus };
+  if (node.type === 'boss') return { kind: 'boss', opponent: BOSS_ORDER[act - 1], locs: locIds, bonus: bonus + (run.heat >= 5 ? 1 : 0), plus: !level && region >= 2, enemyStartBonus };
   const used = run._usedOpp || (run._usedOpp = []);
   const fresh = pools.filter((id) => !used.includes(id));
   const pick = rng.pick(fresh.length ? fresh : pools); used.push(pick); if (used.length > 6) used.shift();
-  return { kind: 'battle', opponent: pick, locs: locIds, bonus, plus: region >= 3, enemyStartBonus };
+  return { kind: 'battle', opponent: pick, locs: locIds, bonus, plus: !level && region >= 3, enemyStartBonus };
 }
 
 // ---------- pools ----------
 export function cardPool(run) {
   const set = new Set(run.unlocked);
-  return CARD_LIST.filter((c) => !c.evo && open(set, c.set) && !run.banished.includes(c.id));
+  return CARD_LIST.filter((c) => !c.evo && open(set, cardUnlock(c)) && !run.banished.includes(c.id));
 }
 export function relicPool(run) {
   const set = new Set(run.unlocked);
-  return RELIC_LIST.filter((r) => open(set, r.unlock) && !run.relics.includes(r.id));
+  return RELIC_LIST.filter((r) => open(set, relicUnlock(r)) && !run.relics.includes(r.id));
 }
 export function gemPool(run) { const set = new Set(run.unlocked); return GEM_LIST.filter((g) => open(set, g.unlock)); }
 
@@ -271,6 +287,15 @@ export function applyBattle(run, meta, node, result) {
   out.shards = Math.round(out.shards * (1 + run.heat * 0.1));
   run.shards += out.shards;
   meta.stats.fights++;
+  out.unlocked = recordProgress(meta, {
+    ...result.progress, gold: result.gold, wins: Number(result.won), bosses: Number(result.won && enc.kind === 'boss'),
+    sweeps: Number(result.lanesWon === 3),
+  });
+  (run.earnedAchievements ??= []).push(...out.unlocked);
+  if (run.level && enc.kind === 'boss') {
+    run.over = result.won ? 'victory' : 'defeat';
+    return out;
+  }
   // reward offer
   run.pendingReward = { kind: enc.kind, cards: rollRewardCards(run, enc.kind), bossRelics: null };
   if (enc.kind === 'boss' && result.won) {
@@ -384,7 +409,10 @@ function evolve(run, meta, uid, catalystUid) {
   removeCard(run, catalyst.uid); run.stats.removed--;
   base.id = recipe.result;
   run.stats.evolutions++;
-  if (meta) { meta.recipes[base.id] = true; meta.stats.evolutions++; }
+  if (meta) {
+    meta.recipes[base.id] = true; meta.stats.evolutions++;
+    (run.earnedAchievements ??= []).push(...recordProgress(meta, { evolved: 1 }));
+  }
   return true;
 }
 export function fuseOptions(run) {
@@ -430,14 +458,21 @@ export function homeChoices(run, n = 3) {
 // ---------- end of run ----------
 export function endRun(run, meta) {
   const victory = run.over === 'victory';
-  let bonus = victory ? 20 + run.heat * 5 : 0;
-  bonus += (run.act - 1) * 3;
+  const bonus = run.level ? (victory ? 5 : 0) : (victory ? 20 + run.heat * 5 : 0) + (run.act - 1) * 3;
   run.shards += bonus;
   meta.shards += run.shards;
   meta.stats.runs++;
-  if (victory) { meta.stats.wins++; meta.maxHeat = Math.max(meta.maxHeat, Math.min(8, run.heat + 1)); }
-  meta.stats.bestAct = Math.max(meta.stats.bestAct, run.act);
-  return { victory, shards: run.shards, bonus };
+  let nextLevel = null;
+  if (run.level) {
+    if (victory && run.level === (meta.levelsCleared ?? 0) + 1) {
+      meta.levelsCleared = run.level;
+      if (run.level < LEVELS.length) nextLevel = run.level + 1;
+    }
+  } else {
+    if (victory) { meta.stats.wins++; meta.maxHeat = Math.max(meta.maxHeat, Math.min(8, run.heat + 1)); }
+    meta.stats.bestAct = Math.max(meta.stats.bestAct, run.act);
+  }
+  return { victory, shards: run.shards, bonus, nextLevel };
 }
 
 export { OPPONENTS, BOSSES };

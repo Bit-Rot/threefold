@@ -4,6 +4,8 @@ import { defaultMeta, loadMeta, saveMeta } from '../src/core/save.js';
 import { CARDS, CARD_LIST, TRIBES } from '../src/data/cards.js';
 import { BOSS_ORDER, OPPONENTS } from '../src/data/enemies.js';
 import { STARTER_DECK_LIST } from '../src/data/starterDecks.js';
+import { ACHIEVEMENTS, cardUnlock } from '../src/data/achievements.js';
+import { LEVELS, levelAvailable } from '../src/data/levels.js';
 import { Battle, DRAW_PER_TURN, MAX_HAND } from '../src/engine/battle.js';
 import * as R from '../src/engine/run.js';
 
@@ -93,7 +95,7 @@ test('map migration updates unstarted stages and preserves a route already in us
   run.map.rows.shift();
   R.migrateRun(run);
   assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
-  assert.equal(run.v, 6);
+  assert.equal(run.v, 7);
 
   run.v = 2;
   run.map.rows.shift();
@@ -183,7 +185,7 @@ test('former Warden purchases and active runs migrate to starter decks', () => {
   saveMeta(meta);
   const migrated = loadMeta();
   assert.equal(migrated.shards, 75);
-  assert.deepEqual(migrated.unlocked, ['gem_echo', 'cache_tide', 'relics_tide', 'locs_tide', 'cache_siege']);
+  assert.deepEqual(new Set(migrated.unlocked), new Set(['gem_echo', ...ACHIEVEMENTS.filter((a) => ['cache_tide', 'relics_tide', 'locs_tide', 'cache_siege'].includes(a.legacy)).map((a) => a.id)]));
   assert.deepEqual(loadMeta(), migrated);
 
   const run = R.newRun(meta, 'tidecaller', 0, 917);
@@ -194,10 +196,54 @@ test('former Warden purchases and active runs migrate to starter decks', () => {
   run.pos = run.map.rows[0][0].id;
   run.deck[0].sockets[0] = 'ember';
   const expected = structuredClone(run);
-  expected.v = 6;
+  expected.v = 7;
   expected.starterDeckId = expected.warden;
   delete expected.warden;
   assert.deepEqual(R.migrateRun(run), expected);
+});
+
+test('each former cache card earns an individual unlock for future drafts and shops', () => {
+  const expected = CARD_LIST.map(cardUnlock).filter(Boolean).sort();
+  const listed = ACHIEVEMENTS.filter((a) => a.kind === 'Cards').map((a) => a.id).sort();
+  assert.deepEqual(listed, expected);
+  assert.equal(new Set(ACHIEVEMENTS.map((a) => a.id)).size, ACHIEVEMENTS.length);
+  const meta = defaultMeta();
+  const run = R.newRun(meta, 'tidecaller', 0, 917);
+  const [[node]] = run.map.rows;
+  for (let i = 0; i < 2; i++) {
+    R.applyBattle(run, meta, node, { won: false, lanesWon: 0, gold: 0, progress: { moves: 1 } });
+  }
+  assert.deepEqual(meta.unlocked, ['card_blink_fox']);
+  assert.deepEqual(run.earnedAchievements, ['card_blink_fox']);
+  assert.ok(!R.cardPool(run).some((card) => card.id === 'blink_fox'));
+  const next = R.newRun(meta, 'bastion', 0, 917);
+  assert.ok(R.cardPool(next).some((card) => card.id === 'blink_fox'));
+  assert.ok(!R.cardPool(next).some((card) => card.id === 'wind_dancer'));
+});
+
+test('levels unlock one step at a time after boss wins and leave Heat with the full run', () => {
+  const meta = defaultMeta();
+  assert.ok(levelAvailable(meta, 1));
+  assert.equal(R.startLevel(meta, 2), null);
+  const defeated = R.startLevel(meta, 1, 'bastion', 917);
+  R.applyBattle(defeated, meta, defeated.map.rows.at(-1)[0], { won: false, lanesWon: 0, gold: 0 });
+  assert.equal(defeated.over, 'defeat');
+  assert.equal(R.endRun(defeated, meta).nextLevel, null);
+  assert.equal(meta.levelsCleared, 0);
+
+  for (const level of LEVELS) {
+    const run = R.startLevel(meta, level.id, 'bastion', 917);
+    const boss = run.map.rows.at(-1)[0];
+    assert.equal(boss.enc.opponent, level.boss);
+    assert.equal(boss.enc.bonus, level.extraPower);
+    assert.equal(R.startLevel(meta, level.id + 1), null);
+    R.applyBattle(run, meta, boss, { won: true, lanesWon: 3, gold: 15 });
+    assert.equal(run.over, 'victory');
+    assert.equal(R.endRun(run, meta).nextLevel, level.id === LEVELS.length ? null : level.id + 1);
+    assert.equal(meta.levelsCleared, level.id);
+    assert.equal(meta.maxHeat, 0);
+  }
+  assert.ok(R.startLevel(meta, 1));
 });
 
 test('fight rewards spread across energy costs and keep the encounter rarity floor', () => {

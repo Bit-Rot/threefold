@@ -6,8 +6,8 @@ STARTER_DECK = sys.argv[3] if len(sys.argv) > 3 else 'bastion'
 JS = """async (starterDeck) => {
   const G = window.__G, A = window.__A, R = window.__R;
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  G.meta.unlocked = ['cache_tide','cache_ash','cache_hex','cache_siege','relics_tide','relics_ash','relics_hex','locs_tide','perk_skip','perk_reroll','perk_scout'];
-  A.newRun(); A.pickStarterDeck({id: starterDeck}); A.startRun();
+  G.meta.unlocked = ['card_blink_fox','card_cinder_imp','card_ember_wisp','card_ballista','relic_tidal_compass','relic_grave_lily','relic_rag_doll','location_riverbank','perk_skip','perk_reroll','perk_scout'];
+  A.pickStarterDeck({id: starterDeck}); A.newRun();
   const seen = new Set(); let steps = 0;
   while (steps++ < 400) {
     await sleep(30);

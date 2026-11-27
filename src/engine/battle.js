@@ -41,6 +41,7 @@ export class Battle {
     this.over = false;
     this.result = null;
     this.flags = {};
+    this.progress = { moves: 0, strikes: 0, lingering: 0, savedEnergy: 0 };
     this.relics = (run.relics || []).map((id) => RELICS[id]).filter(Boolean);
 
     const self = this;
@@ -392,6 +393,7 @@ export class Battle {
       this.lanes[from].slotsBy[bc.side][bc.slot] = null;
       bc.lane = toLane; bc.slot = slot; bc.movedThisTurn = true;
       dest.slotsBy[bc.side][slot] = bc;
+      if (bc.side === PLAYER) this.progress.moves++;
       this.push({ t: 'move', bid: bc.bid, from, to: toLane });
       if (bc.def.onMoved) bc.def.onMoved(this, bc, from);
       for (const g of this.gems(bc.inst)) if (g.onMoved) g.onMoved(this, bc);
@@ -427,6 +429,7 @@ export class Battle {
     const foes = this.cardsIn(laneIdx, this.foe());
     if (!foes.length) { this.float(laneIdx, 'Strike missed', '#aaa', this.foe()); return 0; }
     const t = foes.slice().sort((a, c) => this.power(c) - this.power(a))[0];
+    if (this.me === PLAYER && !this.isProtected(t)) this.progress.strikes++;
     this.push({ t: 'strike', lane: laneIdx, from: this.me, bid: t.bid, n: amt });
     this.buff(t, -amt, true);
     this.recompute();
@@ -469,7 +472,10 @@ export class Battle {
     this.hand = this.hand.filter((h) => h !== hc);
     this.side.discardedCount++;
     this.push({ t: 'discard', hid: hc.hid, side: this.me });
-    if (hc.def.onDiscard) hc.def.onDiscard(this, hc);
+    if (hc.def.onDiscard) {
+      if (this.me === PLAYER) this.progress.lingering++;
+      hc.def.onDiscard(this, hc);
+    }
     this.emit('onDiscard', hc);
     if (!hc.inst?.temp) this.side.discard.push(hc);
   }
@@ -512,6 +518,7 @@ export class Battle {
 
   endTurn() {
     if (this.over) return;
+    if (this.S[PLAYER].energy > 0) this.progress.savedEnergy++;
     this.aiPlan();
     // reveal order: whoever is winning more lanes reveals first (ties: player first)
     const ahead = [0, 1].map((s) => this.lanes.filter((l) => l.totals[s] > l.totals[1 - s]).length);
@@ -570,6 +577,13 @@ export class Battle {
     this.run.pendingGold = 0;
     this.result = { won, lanesWon, lanesLost, tiebreak, laneResults, gold, notes: [] };
     this.emitFor(PLAYER, 'battleEnd', this.result);
+    const player = this.S[PLAYER];
+    const progress = { ...this.progress, destroyed: player.destroyedCount, discarded: player.discardedCount, reveals: 0 };
+    for (const { def } of player.playedAll) {
+      if (def.onReveal) progress.reveals++;
+      if (def.tribe) progress[`tribe:${def.tribe}`] = (progress[`tribe:${def.tribe}`] || 0) + 1;
+    }
+    this.result.progress = progress;
     this.over = true;
     this.push({ t: 'end', result: this.result });
   }

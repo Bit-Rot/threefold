@@ -9,7 +9,9 @@ import { LOCATIONS, LOCATION_LIST } from './data/locations.js';
 import { HOME_UPGRADES } from './data/home.js';
 import { OPPONENTS, BOSSES } from './data/enemies.js';
 import { STARTER_DECKS, STARTER_DECK_LIST } from './data/starterDecks.js';
-import { UNLOCKS, UNLOCK_MAP, HEAT } from './data/meta.js';
+import { PERKS, PERK_MAP, HEAT } from './data/meta.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_MAP, cardUnlock, relicUnlock, locationUnlock } from './data/achievements.js';
+import { LEVELS, levelAvailable } from './data/levels.js';
 import { loadMeta, saveMeta, loadRun, saveRun, clearRun } from './core/save.js';
 import { cardURL, instURL, glyphURL, enemyURL, artURL } from './art/cardRender.js';
 import { Board } from './three/board.js';
@@ -19,7 +21,8 @@ import { sfx, setSound } from './audio.js';
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-const G = { meta: loadMeta(), run: null, screen: 'title', battle: null, sel: null, moveSel: null, modal: null, toast: null, archiveTab: 'Cards', codexTab: 'Cards', heat: 0, starterDeckId: 'bastion' };
+const meta = loadMeta();
+const G = { meta, run: null, screen: 'title', battle: null, sel: null, moveSel: null, modal: null, toast: null, achievementTab: 'Cards', codexTab: 'Cards', heat: Math.min(meta.selectedHeat, meta.maxHeat), starterDeckId: meta.starterDeckId };
 window.__G = G;
 
 // ---------------- renderer ----------------
@@ -54,7 +57,7 @@ function frame() {
 }
 
 // ---------------- persistence helpers ----------------
-function persist() { saveMeta(G.meta); if (G.run && !G.run.over) saveRun(G.run); }
+function persist() { saveMeta(G.meta); if (G.run) saveRun(G.run); }
 setSound(G.meta.settings.sound);
 
 // ---------------- rendering ----------------
@@ -63,10 +66,10 @@ function go(screen) { G.screen = screen; G.modal = null; render(); }
 function render() {
   const fn = SCREENS[G.screen] || SCREENS.title;
   const wantMode = G.screen === 'battle' ? 'battle' : 'menu';
-  const starterScroll = document.body.dataset.screen === 'starterDecks' && G.screen === 'starterDecks' ? $('.screen')?.scrollTop : null;
+  const scroll = document.body.dataset.screen === G.screen && ['starterDecks', 'achievements', 'perkShop', 'levels'].includes(G.screen) ? $('.screen')?.scrollTop : null;
   document.body.dataset.screen = G.screen;
   root.innerHTML = fn() + (G.modal ? modalHtml() : '') + (G.toast ? `<div class="toast">${G.toast}</div>` : '');
-  if (starterScroll != null) $('.screen').scrollTop = starterScroll;
+  if (scroll != null) $('.screen').scrollTop = scroll;
   if (wantMode !== mode) { mode = wantMode; }
   layout();
   if (G.screen === 'battle') afterBattleRender();
@@ -95,18 +98,23 @@ const SCREENS = {};
 
 SCREENS.title = () => {
   const saved = loadRun();
-  return `<div class="screen center title">
+  return `<div class="screen scroll title">
     <div class="logo"><span>THREE</span><span class="fold">FOLD</span></div>
     <p class="tagline">Three lanes. Six turns. One run to break the machines.</p>
     <div class="menu-col">
-      ${saved && !saved.over ? `<button class="btn big" data-a="continue">Continue Run <small>Boss ${saved.act}/${R.ACTS} · ${STARTER_DECKS[saved.starterDeckId ?? saved.warden]?.name}</small></button>` : ''}
-      <button class="btn big primary" data-a="newRun">New Run</button>
-      <button class="btn" data-a="archive">The Archive <small>${G.meta.shards} ✦ shards</small></button>
-      <button class="btn" data-a="codex">Codex</button>
-      <button class="btn" data-a="howto">How to Play</button>
-      <button class="btn ghost" data-a="toggleSound">Sound: ${G.meta.settings.sound ? 'On' : 'Off'}</button>
+      ${saved ? `<button class="btn big" data-a="continue">${saved.over ? 'View result' : 'Continue'}<small>${saved.level ? `Level ${saved.level}` : `Boss ${saved.act}/${R.ACTS}`} · ${STARTER_DECKS[saved.starterDeckId ?? saved.warden]?.name}</small></button>` : ''}
+      <button class="btn big primary" data-a="levels">Levels <small>${G.meta.levelsCleared}/${LEVELS.length} cleared</small></button>
+      <button class="btn" data-a="newRun">New Run <small>${STARTER_DECKS[G.starterDeckId].name} · Heat ${G.heat} · ${R.ACTS} bosses</small></button>
+      <div class="menu-grid">
+        <button class="btn" data-a="characters">Character Select</button>
+        <button class="btn" data-a="achievements">Achievements</button>
+        <button class="btn" data-a="perkShop">Perk Shop <small>${G.meta.shards} ✦</small></button>
+        <button class="btn" data-a="codex">Codex</button>
+        <button class="btn ghost" data-a="howto">How to Play</button>
+        <button class="btn ghost" data-a="toggleSound">Sound ${G.meta.settings.sound ? 'On' : 'Off'}</button>
+      </div>
     </div>
-    <div class="foot">Runs ${G.meta.stats.runs} · Wins ${G.meta.stats.wins} · Max Heat ${G.meta.maxHeat}</div>
+    <div class="foot">Run wins ${G.meta.stats.wins} · Max Heat ${G.meta.maxHeat}</div>
   </div>`;
 };
 
@@ -116,24 +124,36 @@ SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <p><b>Turns.</b> Your Energy each turn equals the turn number. Both sides draw up to ${DRAW_PER_TURN} fresh cards each turn, with room for ${MAX_HAND} including bonuses. Unplayed cards go back into circulation. Face-down plays reveal at the end of the turn, starting with whoever leads in more lanes. Tap a face-down card to take it back. The middle lane is your <b>Home</b>.</p>
   <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when an effect discards the card. <b>Junk</b>: 0-Power clutter that fills slots.</p>
   <p><b>The run.</b> Each of the eight stages starts with a battle. Then choose one of two paths with two nodes apiece. Both paths lead to the same boss. Add a card to your deck after each fight. Cards start with one socket. At a Gem node or Shop, choose a compatible card to socket a gem immediately. Fuse nodes combine duplicate cards. Campfires refill your hearts. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
-  <p><b>Gold</b> = the total Power in the lanes you win. Keep <b>Shards</b> between runs and spend them in the Archive on card caches, gems, relics, locations and perks.</p>
+  <p><b>Levels.</b> Each level is one stage. Beat its boss to unlock the next level. Choose New Run for the full eight-boss route.</p>
+  <p><b>Progression.</b> Earn gold based on your Power in the lanes you win. Spend Shards on permanent perks in the Perk Shop. Achievements unlock individual cards, gems, relics and locations for future runs or levels.</p>
   <p><b>Evolution.</b> Gem nodes and Shops offer an <b>Evo Gem</b> when you have a base card and its catalyst. Choose the pair to evolve the base card immediately. The catalyst is consumed, and the evolved card keeps its sockets and gems.</p>
   <button class="btn primary" data-a="title">Back</button></div></div>`;
 
 SCREENS.starterDecks = () => `<div class="screen scroll"><div class="panel wide">
-  <h2>Choose a starter deck</h2>
+  <h2>Character Select</h2>
   <div class="starter-decks">${STARTER_DECK_LIST.map((deck) => {
     const cover = CARDS[deck.cover];
     return `<button class="starter-deck" aria-pressed="${G.starterDeckId === deck.id}" data-a="pickStarterDeck" data-id="${deck.id}" style="--deck-color:${deck.color}">
       <img class="portrait" src="${artURL(cover.art, cover.id)}" alt="">
       <span class="starter-deck-copy"><strong>${esc(deck.name)}</strong><span>${esc(deck.text)}</span></span></button>`;
   }).join('')}</div>
-  <div class="heat"><h3>Heat ${G.heat}</h3>
+  <div class="heat"><h3>Full Run Heat ${G.heat}</h3>
     <div class="row"><button class="btn sm" data-a="heat" data-d="-1" ${G.heat <= 0 ? 'disabled' : ''}>−</button>
     <div class="heat-list">${G.heat ? HEAT.filter((h) => h.lvl <= G.heat).map((h) => `<div>🔥 ${h.text}</div>`).join('') : '<div class="dim">No modifiers. Win a run to unlock Heat.</div>'}</div>
     <button class="btn sm" data-a="heat" data-d="1" ${G.heat >= G.meta.maxHeat ? 'disabled' : ''}>+</button></div></div>
-  <div class="row end"><button class="btn ghost" data-a="title">Back</button><button class="btn" data-a="previewStarterDeck">View deck</button><button class="btn big primary" data-a="startRun">Begin Run</button></div>
+  <div class="row end"><button class="btn ghost" data-a="title">Back</button><button class="btn" data-a="previewStarterDeck">View deck</button></div>
   </div></div>`;
+
+SCREENS.levels = () => `<div class="screen scroll"><div class="panel wide">
+  <h2>Levels</h2><p>Beat the boss to unlock the next level.</p>
+  <div class="levels-list">${LEVELS.map((level) => {
+    const available = levelAvailable(G.meta, level.id);
+    const cleared = level.id <= G.meta.levelsCleared;
+    return `<button class="btn level ${!cleared && available ? 'primary' : ''}" data-a="startLevel" data-id="${level.id}" ${available ? '' : 'disabled'}>
+      <b>Level ${level.id}</b><small>${esc(OPPONENTS[level.boss].name)}${level.extraPower ? ` · +${level.extraPower} enemy Power` : ''}</small>
+      <span>${cleared ? 'Cleared' : available ? 'Play' : 'Locked'}</span></button>`;
+  }).join('')}</div>
+  <div class="row end"><button class="btn" data-a="title">Back</button></div></div></div>`;
 
 // ---------- map ----------
 SCREENS.map = () => {
@@ -158,7 +178,7 @@ SCREENS.map = () => {
       <button class="btn sm ghost preview-close" data-a="closeMapPreview" aria-label="Close node details">✕</button></section>`;
   }
   return `${topbar()}<div class="screen map">
-    <div class="maptitle">Boss ${r.act} of ${R.ACTS} · ${esc(OPPONENTS[rows[0][0].enc.opponent].name)}</div>
+    <div class="maptitle">${r.level ? `Level ${r.level}` : `Boss ${r.act} of ${R.ACTS}`} · ${esc(OPPONENTS[rows[0][0].enc.opponent].name)}</div>
     ${hint ? `<p class="map-hint">${hint}</p>` : ''}
     ${preview}
     <div class="map-viewport"><div class="mapwrap"><svg class="maplines" id="maplines"></svg>
@@ -232,7 +252,7 @@ function battleResultHtml() {
     <div class="lanes-res">${res.laneResults.map((lr, i) => `<div class="lr ${lr.won ? 'w' : lr.lost ? 'l' : 't'}"><small>${i === 1 ? 'Home' : i === 0 ? 'Left' : 'Right'}</small><b>${lr.player}</b><span>vs</span><b>${lr.enemy}</b></div>`).join('')}</div>
     <p>${res.lanesWon} won · ${res.lanesLost} lost${res.tiebreak ? ' — decided by total Power' : ''}.</p>
     ${out ? `<p class="gains"><span>+${out.gold} gold</span> <span>+${out.shards} ✦</span>${out.heartLost ? ' <span class="bad">−1 heart</span>' : ''}</p>
-    ${out.notes.map((n) => `<p class="dim">${esc(n)}</p>`).join('')}` : ''}
+    ${out.notes.map((n) => `<p class="dim">${esc(n)}</p>`).join('')}${achievementRewards(out.unlocked)}` : ''}
     <button class="btn big primary" data-a="afterBattle">Continue</button></div></div>`;
 }
 
@@ -470,27 +490,53 @@ SCREENS.home = () => {
 SCREENS.summary = () => {
   const s = G.summary; const r = s.run;
   return `<div class="screen scroll center"><div class="panel ${s.victory ? 'win' : 'lose'}">
-    <h2>${s.victory ? 'The machines fall silent.' : 'Your run ends.'}</h2>
-    <p>${s.victory ? `Victory with ${STARTER_DECKS[r.starterDeckId].name} at Heat ${r.heat}!` : `Run ended during boss stage ${r.act}.`}</p>
+    <h2>${r.level ? `Level ${r.level} ${s.victory ? 'cleared' : 'defeat'}` : s.victory ? 'The machines fall silent.' : 'Your run ends.'}</h2>
+    ${r.level ? (s.nextLevel ? `<p>Level ${s.nextLevel} unlocked.</p>` : '') : `<p>${s.victory ? `Victory with ${STARTER_DECKS[r.starterDeckId].name} at Heat ${r.heat}!` : `Run ended during boss stage ${r.act}.`}</p>`}
     <div class="stats"><div><b>${r.fightsWon}/${r.fights}</b><small>fights won</small></div><div><b>${r.deck.length}</b><small>cards</small></div><div><b>${r.relics.length}</b><small>relics</small></div><div><b>${r.stats.evolutions}</b><small>evolutions</small></div></div>
     <p class="gains"><span>+${s.shards} ✦ shards</span>${s.bonus ? ` <small>(incl. ${s.bonus} bonus)</small>` : ''}</p>
-    <p class="dim">Total shards: ${G.meta.shards}. Spend them in the Archive.</p>
-    <div class="row center"><button class="btn primary big" data-a="archive">The Archive</button><button class="btn" data-a="title">Title</button></div></div></div>`;
+    ${achievementRewards(r.earnedAchievements)}${pinnedProgress()}
+    <div class="row center">${r.level ? '<button class="btn primary" data-a="levels">Levels</button>' : ''}<button class="btn" data-a="achievements">Achievements</button><button class="btn" data-a="title">Title</button></div></div></div>`;
 };
 
-// ---------- archive ----------
-SCREENS.archive = () => {
-  const m = G.meta; const tabs = ['Cards', 'Gems', 'Relics', 'Locations', 'Perks'];
-  const list = UNLOCKS.filter((u) => u.kind === G.archiveTab);
+function achievementRewards(ids = []) {
+  return ids.length ? `<p class="achievement-rewards"><b>Unlocked</b> ${ids.map((id) => esc(ACHIEVEMENT_MAP[id].name)).join(' · ')}</p>` : '';
+}
+
+function progressLabel(a) {
+  const count = G.meta.unlocked.includes(a.id) ? a.target : Math.min(a.target, G.meta.achievementProgress[a.metric] || 0);
+  return `${count}/${a.target}`;
+}
+
+function pinnedProgress() {
+  const a = ACHIEVEMENT_MAP[G.meta.pinnedAchievement];
+  return a ? `<p class="dim">Pinned: ${esc(a.name)} · ${progressLabel(a)}</p>` : '';
+}
+
+SCREENS.achievements = () => {
+  const tabs = ['Cards', 'Gems', 'Relics', 'Locations', 'Heat'];
+  const owned = R.unlockedSet(G.meta);
+  const list = ACHIEVEMENTS.filter((a) => a.kind === G.achievementTab);
+  return `<div class="screen scroll"><div class="panel wide">
+    <h2>Achievements</h2><p>Progress carries across runs and levels. Earned rewards enter future runs and levels.</p>${pinnedProgress()}
+    <div class="tabs">${tabs.map((t) => `<button class="tab ${G.achievementTab === t ? 'on' : ''}" data-a="achievementTab" data-t="${t}">${t}</button>`).join('')}</div>
+    <div class="unlocks">${G.achievementTab === 'Heat' ? `<div class="unlock"><div><b>Heat ${G.meta.maxHeat}/8</b><p>Win the full eight-boss run at your highest unlocked Heat to unlock the next one.</p></div></div>` : list.map((a) => {
+      const have = owned.has(a.id);
+      const pinned = G.meta.pinnedAchievement === a.id;
+      return `<div class="unlock ${have ? 'have' : ''}" data-achievement="${a.id}"><div><b>${esc(a.name)}</b><p>${esc(a.requirement)}</p></div>
+        <div class="achievement-status"><small>${progressLabel(a)}</small>
+        ${have ? '<span class="owned">Unlocked</span>' : ''}${!have || pinned ? `<button class="btn sm" data-a="pinAchievement" data-id="${a.id}" aria-pressed="${pinned}">${pinned ? 'Unpin' : 'Pin'}</button>` : ''}</div></div>`;
+    }).join('')}</div><div class="row end"><button class="btn" data-a="title">Back</button></div></div></div>`;
+};
+
+SCREENS.perkShop = () => {
+  const m = G.meta;
   const owned = R.unlockedSet(m);
   return `<div class="screen scroll"><div class="panel wide">
-    <h2>The Archive <span class="shards">${m.shards} ✦</span></h2>
-    <p class="dim">Unlocks add new options to future runs; they don't make enemies easier.</p>
-    <div class="tabs">${tabs.map((t) => `<button class="tab ${G.archiveTab === t ? 'on' : ''}" data-a="archiveTab" data-t="${t}">${t}</button>`).join('')}</div>
-    <div class="unlocks">${list.map((u) => {
+    <h2>Perk Shop <span class="shards">${m.shards} ✦</span></h2>
+    <div class="unlocks">${PERKS.map((u) => {
       const have = owned.has(u.id); const req = u.requires && !owned.has(u.requires);
-      return `<div class="unlock ${have ? 'have' : ''}"><div><b>${esc(u.name)}</b><p>${esc(u.desc)}</p>${req ? `<small class="bad">Requires ${esc(UNLOCK_MAP[u.requires].name)}</small>` : ''}</div>
-        ${have ? '<span class="owned">Unlocked</span>' : `<button class="btn ${m.shards >= u.cost && !req ? 'primary' : ''}" data-a="buyUnlock" data-id="${u.id}" ${m.shards < u.cost || req ? 'disabled' : ''}>${u.cost} ✦</button>`}</div>`;
+      return `<div class="unlock ${have ? 'have' : ''}"><div><b>${esc(u.name)}</b><p>${esc(u.desc)}</p>${req ? `<small class="bad">Requires ${esc(PERK_MAP[u.requires].name)}</small>` : ''}</div>
+        ${have ? '<span class="owned">Unlocked</span>' : `<button class="btn ${m.shards >= u.cost && !req ? 'primary' : ''}" data-a="buyPerk" data-id="${u.id}" ${m.shards < u.cost || req ? 'disabled' : ''}>${u.cost} ✦</button>`}</div>`;
     }).join('')}</div>
     <div class="row end"><button class="btn" data-a="title">Back</button></div></div></div>`;
 };
@@ -500,11 +546,11 @@ SCREENS.codex = () => {
   const tabs = ['Cards', 'Evolutions', 'Relics', 'Enemies', 'Locations', 'Home'];
   const un = R.unlockedSet(G.meta);
   let body = '';
-  if (G.codexTab === 'Cards') body = `<div class="deckgrid small">${CARD_LIST.filter((c) => !c.evo).map((c) => un.has(c.set) || c.set === 'core' ? cardImg(c.id, {}, `data-a="inspectDef" data-id="${c.id}"`) : `<div class="card lockedcard"><span>🔒</span><small>${esc(UNLOCK_MAP[c.set]?.name || 'Locked')}</small></div>`).join('')}</div>`;
+  if (G.codexTab === 'Cards') body = `<div class="deckgrid small">${CARD_LIST.filter((c) => !c.evo).map((c) => !cardUnlock(c) || un.has(cardUnlock(c)) ? cardImg(c.id, {}, `data-a="inspectDef" data-id="${c.id}"`) : `<div class="card lockedcard"><span>🔒</span><small>${esc(c.name)}</small></div>`).join('')}</div>`;
   if (G.codexTab === 'Evolutions') body = `<div class="evo-list">${EVO_RECIPES.map((e) => `<div class="evo">${cardImg(e.base)}<span class="plus">+</span>${cardImg(e.catalyst)}<span class="plus">=</span>${G.meta.recipes[e.result] ? cardImg(e.result, {}, `data-a="inspectDef" data-id="${e.result}"`) : '<div class="card lockedcard"><span>?</span><small>Evolve to discover</small></div>'}</div>`).join('')}</div>`;
-  if (G.codexTab === 'Relics') body = `<div class="relic-choices">${RELIC_LIST.map((r) => (un.has(r.unlock) || !r.unlock ? relicCard(r.id) : `<div class="relic-card locked"><b>🔒 ${esc(r.name)}</b><small>${esc(UNLOCK_MAP[r.unlock]?.name)}</small></div>`)).join('')}</div>`;
+  if (G.codexTab === 'Relics') body = `<div class="relic-choices">${RELIC_LIST.map((r) => (!relicUnlock(r) || un.has(relicUnlock(r)) ? relicCard(r.id) : `<div class="relic-card locked"><b>🔒 ${esc(r.name)}</b></div>`)).join('')}</div>`;
   if (G.codexTab === 'Enemies') body = `<div class="enemy-list">${Object.values(OPPONENTS).map((o) => `<div class="enemy-entry ${o.tier}"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${o.tier === 'boss' ? 'Boss' : 'Act ' + o.acts.join('–')}</small><p>${esc(o.boss ? BOSSES[o.boss].text : o.text)}</p></div></div>`).join('')}</div>`;
-  if (G.codexTab === 'Locations') body = `<div class="enemy-list">${LOCATION_LIST.map((l) => `<div class="enemy-entry"><img src="${artURL({ f: 'none', bg: l.art.bg, pal: l.art.pal }, 'loc' + l.id)}"><div><b>${esc(l.name)}</b>${l.unlock && !un.has(l.unlock) ? ' 🔒' : ''}<p>${esc(l.text)}</p></div></div>`).join('')}</div>`;
+  if (G.codexTab === 'Locations') body = `<div class="enemy-list">${LOCATION_LIST.map((l) => `<div class="enemy-entry"><img src="${artURL({ f: 'none', bg: l.art.bg, pal: l.art.pal }, 'loc' + l.id)}"><div><b>${esc(l.name)}</b>${locationUnlock(l) && !un.has(locationUnlock(l)) ? ' 🔒' : ''}<p>${esc(l.text)}</p></div></div>`).join('')}</div>`;
   if (G.codexTab === 'Home') body = `<div class="relic-choices">${Object.values(HOME_UPGRADES).map((h) => `<div class="relic-card"><img src="${glyphURL(h.icon, 96, '#4a2a6a')}"><b>${esc(h.name)}</b><small>${esc(h.text)}</small></div>`).join('')}</div>`;
   return `<div class="screen scroll"><div class="panel wide"><h2>Codex</h2>
     <div class="tabs">${tabs.map((t) => `<button class="tab ${G.codexTab === t ? 'on' : ''}" data-a="codexTab" data-t="${t}">${t}</button>`).join('')}</div>${body}
@@ -557,6 +603,7 @@ function modalHtml() {
       <button class="btn primary" data-a="confirmEvo" data-uid="${base.uid}" data-catalyst="${catalyst.uid}">Evolve${m.price == null ? '' : ` · ${m.price}g`}</button>
     </div>`).join('')}</div>`;
   if (m.type === 'menu') inner = `<h2>Paused</h2><div class="menu-col"><button class="btn" data-a="closeModal">Resume</button><button class="btn" data-a="howtoModal">How to Play</button><button class="btn" data-a="toggleSound">Sound: ${G.meta.settings.sound ? 'On' : 'Off'}</button><button class="btn" data-a="saveQuit">Save & Quit to Title</button><button class="btn bad" data-a="abandon">Abandon Run</button></div>`;
+  if (m.type === 'replaceRun') inner = `<h2>Replace the current save?</h2><p>Starting ${m.level ? `Level ${m.level}` : 'a new run'} will overwrite your current run.</p><div class="row end"><button class="btn" data-a="closeModal">Cancel</button><button class="btn primary" data-a="confirmStart">Start</button></div>`;
   if (m.type === 'help') inner = `<h2>Battle Basics</h2><div class="prose"><p>Drag a card onto a lane (or tap a card, then tap a lane). Win <b>2 of 3</b> lanes after ${G.battle?.maxTurns || 6} turns.</p><p>Energy = turn number. Played cards stay face-down until <b>End Turn</b>, then both sides reveal. Tap a face-down card to take it back.</p><p>The badges show each side's Power per lane (green = you're winning). Tap a revealed card to inspect or <b>Move</b> it; tap the opponent's portrait to see their info.</p></div>`;
   return `<div class="overlay" data-a="closeModalBg"><div class="panel modal ${m.type}">${inner}<button class="btn closex" data-a="closeModal">✕</button></div></div>`;
 }
@@ -566,14 +613,28 @@ const A = {};
 A.title = () => go('title');
 A.howto = () => go('howto');
 A.toggleSound = () => { G.meta.settings.sound = !G.meta.settings.sound; setSound(G.meta.settings.sound); persist(); render(); };
-A.newRun = () => { G.heat = Math.min(G.heat, G.meta.maxHeat); go('starterDecks'); };
-A.pickStarterDeck = (d) => { G.starterDeckId = d.id; render(); $('.starter-deck[aria-pressed="true"]')?.focus({ preventScroll: true }); };
-A.previewStarterDeck = () => { G.modal = { type: 'starterDeck' }; render(); };
-A.heat = (d) => { G.heat = Math.max(0, Math.min(G.meta.maxHeat, G.heat + +d.d)); render(); };
-A.startRun = () => {
-  G.run = R.newRun(G.meta, G.starterDeckId, G.heat);
-  persist(); G.mapSel = null; go('map');
+A.characters = () => go('starterDecks');
+A.levels = () => go('levels');
+A.pickStarterDeck = (d) => {
+  if (!Object.hasOwn(STARTER_DECKS, d.id)) return;
+  G.starterDeckId = G.meta.starterDeckId = d.id;
+  saveMeta(G.meta); render(); $('.starter-deck[aria-pressed="true"]')?.focus({ preventScroll: true });
 };
+A.previewStarterDeck = () => { G.modal = { type: 'starterDeck' }; render(); };
+A.heat = (d) => { G.heat = G.meta.selectedHeat = Math.max(0, Math.min(G.meta.maxHeat, G.heat + +d.d)); saveMeta(G.meta); render(); };
+A.newRun = () => requestStart(null);
+A.startLevel = (d) => { if (levelAvailable(G.meta, +d.id)) requestStart(+d.id); };
+function requestStart(level) {
+  if (!loadRun()) return startRun(level);
+  G.modal = { type: 'replaceRun', level }; render();
+}
+A.confirmStart = () => { if (G.modal?.type === 'replaceRun') startRun(G.modal.level); };
+function startRun(level) {
+  const run = level == null ? R.newRun(G.meta, G.starterDeckId, G.heat) : R.startLevel(G.meta, level);
+  if (!run) return;
+  G.run = run; G.battle = null; G.banishMode = false;
+  persist(); G.mapSel = null; go('map');
+}
 A.continue = () => {
   const saved = loadRun();
   if (!saved) return go('title');
@@ -589,11 +650,21 @@ function resumeRun() {
   if (r.node && !r.node.done) return openNode(R.nodeById(r, r.node.id), true);
   go('map');
 }
-A.archive = () => go('archive');
-A.archiveTab = (d) => { G.archiveTab = d.t; render(); };
+A.perkShop = () => go('perkShop');
+A.achievements = () => go('achievements');
+A.achievementTab = (d) => { G.achievementTab = d.t; render(); };
+A.pinAchievement = (d) => {
+  if (!Object.hasOwn(ACHIEVEMENT_MAP, d.id)) return;
+  G.meta.pinnedAchievement = G.meta.pinnedAchievement === d.id ? null : d.id;
+  saveMeta(G.meta); render();
+};
 A.codex = () => go('codex');
 A.codexTab = (d) => { G.codexTab = d.t; render(); };
-A.buyUnlock = (d) => { const u = UNLOCK_MAP[d.id]; if (!u || G.meta.shards < u.cost) return; G.meta.shards -= u.cost; G.meta.unlocked.push(u.id); sfx.evolve(); persist(); toast(`Unlocked ${u.name}!`); };
+A.buyPerk = (d) => {
+  const u = PERK_MAP[d.id]; const m = G.meta;
+  if (!Object.hasOwn(PERK_MAP, d.id) || m.shards < u.cost || m.unlocked.includes(u.id) || (u.requires && !m.unlocked.includes(u.requires))) return;
+  m.shards -= u.cost; m.unlocked.push(u.id); sfx.evolve(); saveMeta(m); toast(`Unlocked ${u.name}!`);
+};
 A.deck = () => { G.modal = { type: 'deck' }; render(); };
 A.menu = () => { G.modal = { type: 'menu' }; render(); };
 A.howtoModal = () => go('howto');

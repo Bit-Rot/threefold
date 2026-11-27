@@ -3,7 +3,8 @@ import { Battle } from '../src/engine/battle.js';
 import * as R from '../src/engine/run.js';
 import { defaultMeta } from '../src/core/save.js';
 import { makeRng } from '../src/core/rng.js';
-import { UNLOCKS } from '../src/data/meta.js';
+import { PERKS } from '../src/data/meta.js';
+import { ACHIEVEMENTS } from '../src/data/achievements.js';
 import { STARTER_DECK_LIST } from '../src/data/starterDecks.js';
 
 function botTurn(b, rng) {
@@ -86,7 +87,7 @@ function playRun(starterDeckId, heat, seed, meta) {
 }
 
 const meta = defaultMeta();
-meta.unlocked = UNLOCKS.map((u) => u.id);
+meta.unlocked = [...PERKS, ...ACHIEVEMENTS].map((u) => u.id);
 const total = { runs: 0, victories: 0, byKind: {} };
 const N = Number(process.argv[2] || 30);
 for (let i = 0; i < N; i++) for (const starter of STARTER_DECK_LIST) {
