@@ -85,9 +85,6 @@ C('gravedigger', 'Gravedigger', 3, 3, 'uncommon', 'Fiend', 'On Reveal: Destroy y
 C('mimic', 'Mimic Chest', 3, 0, 'uncommon', 'Fiend', "On Reveal: This card's power becomes equal to your strongest card here.", { f: 'chest', pal: 'ember', bg: 'cave' }, {
   tags: ['reveal'], onReveal(b, bc) { const o = others(b, bc); if (!o.length) return; const s = strongest(o, b); b.buff(bc, Math.max(0, b.power(s) - b.power(bc))); },
 });
-C('tinker', 'Tinker', 2, 2, 'common', 'Construct', 'On Reveal: Destroy all Junk here. +2 power for each.', { f: 'hum', hat: 'goggles', item: 'wrench', pal: 'steel', bg: 'workshop' }, {
-  tags: ['reveal'], onReveal(b, bc) { let n = 0; for (const c of others(b, bc)) if (c.def.id === 'junk') { b.destroy(c); n++; } if (n) b.buff(bc, 2 * n); },
-});
 C('pyre_priest', 'Pyre Priest', 2, 3, 'uncommon', 'Fiend', 'On Reveal: Destroy your weakest other card here. If you do, +3 power.', { f: 'hum', hat: 'mitre', item: 'torch', pal: 'ember', bg: 'fire' }, {
   tags: ['reveal', 'destroy'], set: 'cache_ash', onReveal(b, bc) { const o = others(b, bc); if (!o.length) return; if (b.destroy(weakest(o, b))) b.buff(bc, 3); },
 });
@@ -117,12 +114,16 @@ C('storm_caller', 'Storm Caller', 5, 4, 'rare', 'Spirit', 'On Reveal: Strike 3 i
 C('time_weaver', 'Time Weaver', 4, 3, 'uncommon', 'Sage', 'On Reveal: +2 Energy next turn.', { f: 'hum', hat: 'scholar', item: 'hourglass', pal: 'violet', bg: 'void' }, {
   tags: ['reveal'], set: 'cache_patience', onReveal(b) { b.gainEnergyNext(2); },
 });
-C('avalanche', 'Avalanche Titan', 6, 8, 'rare', 'Construct', 'On Reveal: Destroy all Junk on your side. +3 power for each.', { f: 'golem', pal: 'frost', bg: 'snow' }, {
-  tags: ['reveal'], onReveal(b, bc) { let n = 0; for (const c of b.allCards()) if (c.def.id === 'junk') { b.destroy(c); n++; } if (n) b.buff(bc, 3 * n); },
+C('signal_runner', 'Signal Runner', 1, 2, 'rare', 'Knight', 'On Reveal: Strike 2 in each adjacent lane.', { f: 'hum', hat: 'hood', item: 'crossbow', pal: 'storm', bg: 'field' }, {
+  tags: ['reveal', 'strike'], onReveal(b, bc) {
+    if (bc.lane > 0) b.strike(bc.lane - 1, 2);
+    if (bc.lane < b.lanes.length - 1) b.strike(bc.lane + 1, 2);
+  },
 });
-
-C('scrap_thrower', 'Scrap Thrower', 2, 3, 'common', 'Construct', "On Reveal: Add a Junk to your opponent's side here.", { f: 'robot', pal: 'rust', bg: 'workshop' }, {
-  tags: ['reveal', 'junk'], onReveal(b, bc) { b.spawn('junk', bc.lane, 0, b.foe()); },
+C('field_medic', 'Field Medic', 2, 2, 'rare', 'Sage', 'On Reveal: Give your weakest card in each other lane +2 Power.', { f: 'hum', hat: 'veil', item: 'potion', pal: 'dawn', bg: 'field' }, {
+  tags: ['reveal'], onReveal(b, bc) {
+    for (const lane of b.lanes) if (lane.idx !== bc.lane) b.buff(weakest(b.cardsIn(lane.idx), b), 2);
+  },
 });
 C('ice_sentry', 'Ice Sentry', 3, 4, 'uncommon', 'Construct', 'On Reveal: Freeze a random other lane.', { f: 'golem', pal: 'frost', bg: 'snow' }, {
   tags: ['reveal', 'freeze'], onReveal(b, bc) { b.freeze(b.rng.pick(b.otherLanes(bc.lane))); },
@@ -177,8 +178,8 @@ C('siegecrafter', 'Siegecrafter', 3, 3, 'uncommon', 'Construct', 'Ongoing: Your 
 C('queen_thorns', 'Queen of Thorns', 5, 5, 'rare', 'Spirit', 'Ongoing: Enemy cards here have -1 Power. End of turn: Strike 2 here.', { f: 'hum', hat: 'crown', item: 'rose', pal: 'forest', bg: 'garden' }, {
   tags: ['ongoing', 'strike'], ongoing(b, bc) { for (const c of b.foesIn(bc.lane)) b.aura(c, -1); }, endTurn(b, bc) { b.strike(bc.lane, 2); },
 });
-C('scrap_golem', 'Scrap Golem', 3, 2, 'uncommon', 'Construct', 'Ongoing: +2 power for each Junk on your side.', { f: 'golem', pal: 'rust', bg: 'workshop' }, {
-  tags: ['ongoing'], ongoing(b, bc) { b.aura(bc, 2 * b.allCards().filter((c) => c.def.id === 'junk').length); },
+C('forge_guard', 'Forge Guard', 2, 2, 'uncommon', 'Construct', 'Ongoing: +2 Power if you have another Construct here.', { f: 'robot', item: 'shield', pal: 'ember', bg: 'workshop' }, {
+  tags: ['ongoing'], ongoing(b, bc) { if (others(b, bc).some((c) => c.def.tribe === 'Construct')) b.aura(bc, 2); },
 });
 C('crystal_golem', 'Crystal Golem', 4, 5, 'uncommon', 'Construct', 'Ongoing: +3 Power while you have unspent Energy.', { f: 'crystal', pal: 'frost', bg: 'cave' }, {
   tags: ['ongoing'], set: 'cache_patience', ongoing(b, bc) { if (b.energy > 0) b.aura(bc, 3); },

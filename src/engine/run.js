@@ -41,12 +41,19 @@ export function makeInst(run, id, extra = {}) {
   return { uid: 'c' + run.nextUid++, id, plus: 0, bonus: 0, sockets: new Array(def.token ? 0 : socketsFor(def)).fill(null), ...extra };
 }
 
+const RETIRED_CARDS = {
+  tinker: 'twin_blades',
+  scrap_thrower: 'slinger',
+  scrap_golem: 'ice_sentry',
+  avalanche: 'queen_thorns',
+};
+
 // ---------- new run ----------
 export function newRun(meta, wardenId, heat = 0, seed) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
   const warden = WARDENS[wardenId];
   const run = {
-    v: 3, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
+    v: 4, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
     deck: [], relics: [], gold: 60, hearts: 3, maxHearts: 3, home: [],
     map: null, pos: null, visited: [], fightsWon: 0, fights: 0, shards: 0, log: [],
     rerolls: 0, banishes: 0, banished: [], secondWind: {}, removalsBought: 0, over: false,
@@ -69,15 +76,24 @@ export function newRun(meta, wardenId, heat = 0, seed) {
 }
 
 export function migrateRun(run) {
-  if (run.v !== 1 && run.v !== 2) return run;
+  if (![1, 2, 3].includes(run.v)) return run;
   if (run.v === 1) {
     run.gold += (run.gems || []).reduce((sum, id) => sum + (GEMS[id]?.price || 0), 0);
     delete run.gems;
   }
   run.visited ||= [];
   // Preserve encounters already entered and the choices made on their maps.
-  if (!run.pos) run.map = genActMap(run, run.act);
-  run.v = 3;
+  if (run.v < 3 && !run.pos) run.map = genActMap(run, run.act);
+  for (const card of run.deck) card.id = RETIRED_CARDS[card.id] ?? card.id;
+  for (const item of run.node?.shop?.items || []) {
+    if (item.kind === 'card') item.id = RETIRED_CARDS[item.id] ?? item.id;
+  }
+  if (run.pendingReward) {
+    const reward = run.pendingReward;
+    reward.kind = nodeById(run, run.pos)?.enc?.kind ?? 'battle';
+    reward.cards = rollRewardCards(run, reward.kind, reward.cards.length);
+  }
+  run.v = 4;
   return run;
 }
 
@@ -151,19 +167,27 @@ export function relicPool(run) {
 const WARDEN_RELICS = [];
 export function gemPool(run) { const set = new Set(run.unlocked); return GEM_LIST.filter((g) => open(set, g.unlock)); }
 
+const RARITIES = ['common', 'uncommon', 'rare', 'legendary'];
+function eligibleCards(run, minRarity = 'common') {
+  const min = RARITIES.indexOf(minRarity);
+  return cardPool(run).filter((c) => RARITIES.indexOf(c.rarity) >= min);
+}
+function cardWeight(run) {
+  const actBoost = (regionFor(run.act) - 1) * 0.5;
+  return (c) => RARITY_WEIGHT[c.rarity] * (c.rarity === 'common' ? 1 : 1 + actBoost);
+}
+
 export function rollCards(run, n, minRarity) {
   const rng = rngFor(run);
-  const order = ['common', 'uncommon', 'rare', 'legendary'];
-  const minI = minRarity ? order.indexOf(minRarity) : 0;
-  const pool = cardPool(run).filter((c) => order.indexOf(c.rarity) >= minI);
-  const actBoost = (regionFor(run.act) - 1) * 0.5;
-  const out = [];
-  let guard = 0;
-  while (out.length < n && guard++ < 200) {
-    const c = rng.weighted(pool, (c) => RARITY_WEIGHT[c.rarity] * (c.rarity === 'common' ? 1 : 1 + actBoost));
-    if (!out.includes(c.id)) out.push(c.id);
+  const pool = eligibleCards(run, minRarity);
+  const weight = cardWeight(run);
+  const cards = [];
+  while (cards.length < n && pool.length) {
+    const card = rng.weighted(pool, weight);
+    cards.push(card.id);
+    pool.splice(pool.indexOf(card), 1);
   }
-  return out;
+  return cards;
 }
 
 export function rewardCount(run) {
@@ -171,6 +195,42 @@ export function rewardCount(run) {
   for (const id of run.relics) n += RELICS[id]?.rewardBonus || 0;
   if (run.heat >= 6) n--;
   return Math.max(2, n);
+}
+
+const rewardBand = (cost) => cost <= 2 ? 0 : cost <= 4 ? 1 : 2;
+export function rollRewardCards(run, kind, count = rewardCount(run), kept = []) {
+  const minRarity = kind === 'boss' ? 'rare' : kind === 'elite' ? 'uncommon' : 'common';
+  const pool = eligibleCards(run, minRarity).filter((card) => !kept.includes(card.id));
+  const rng = rngFor(run);
+  const weight = cardWeight(run);
+  const cards = [...kept];
+  const pick = (choices) => {
+    if (!choices.length) return;
+    const card = rng.weighted(choices, weight);
+    cards.push(card.id);
+    pool.splice(pool.indexOf(card), 1);
+  };
+  // Guarantee a cheap pick and vary the second band when Heat reduces the offer to two cards.
+  for (const band of [0, ...rng.shuffle([1, 2])]) {
+    if (cards.length >= count) break;
+    if (!cards.some((id) => rewardBand(CARDS[id].cost) === band)) {
+      pick(pool.filter((card) => rewardBand(card.cost) === band));
+    }
+  }
+  while (cards.length < count && pool.length) pick(pool);
+  return kept.length ? cards : rng.shuffle(cards);
+}
+
+export function banishRewardCard(run, index) {
+  const reward = run.pendingReward;
+  const id = reward?.cards[index];
+  if (!id || run.banishes <= 0) return null;
+  run.banishes--;
+  run.banished.push(id);
+  const kept = reward.cards.filter((_, i) => i !== index);
+  const offer = rollRewardCards(run, reward.kind, reward.cards.length, kept);
+  reward.cards.splice(index, 1, ...offer.slice(kept.length));
+  return id;
 }
 
 // ---------- battle results ----------
@@ -196,8 +256,7 @@ export function applyBattle(run, meta, node, result) {
   run.shards += out.shards;
   meta.stats.fights++;
   // reward offer
-  const minR = enc.kind === 'boss' ? 'rare' : enc.kind === 'elite' ? 'uncommon' : null;
-  run.pendingReward = { cards: rollCards(run, rewardCount(run), minR), bossRelics: null };
+  run.pendingReward = { kind: enc.kind, cards: rollRewardCards(run, enc.kind), bossRelics: null };
   if (enc.kind === 'boss' && result.won) {
     const choices = rollRelicChoices(run, 3);
     if (choices.length) run.pendingReward.bossRelics = choices;

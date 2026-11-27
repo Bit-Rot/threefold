@@ -688,12 +688,12 @@ A.takeCard = (d) => {
   afterReward(`${CARDS[id].name} added to your deck.`);
 };
 A.skipCard = () => { G.run.gold += 10; afterReward('Skipped.'); };
-A.reroll = () => { const r = G.run; if (r.rerolls <= 0) return; r.rerolls--; r.pendingReward.cards = R.rollCards(r, R.rewardCount(r)); persist(); render(); };
+A.reroll = () => { const r = G.run; if (r.rerolls <= 0) return; r.rerolls--; r.pendingReward.cards = R.rollRewardCards(r, r.pendingReward.kind); persist(); render(); };
 A.banishMode = () => { G.banishMode = !G.banishMode; render(); };
 A.banish = (d) => {
-  const r = G.run; const id = r.pendingReward.cards[+d.i]; if (r.banishes <= 0) return;
-  r.banishes--; r.banished.push(id); G.banishMode = false;
-  r.pendingReward.cards[+d.i] = R.rollCards(r, 1)[0]; persist(); toast(`${CARDS[id].name} banished.`);
+  const id = R.banishRewardCard(G.run, +d.i);
+  if (!id) return;
+  G.banishMode = false; persist(); toast(`${CARDS[id].name} banished.`);
 };
 A.bossRelic = (d) => { const r = G.run; R.gainRelic(r, d.id); r.pendingReward.bossRelics = null; persist(); render(); };
 function afterReward(msg) {

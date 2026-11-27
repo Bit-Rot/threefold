@@ -36,7 +36,7 @@ export const WARDENS = {
   forgemaster: {
     id: 'forgemaster', name: 'Brannoc', title: 'the Forgemaster', color: '#c9c9d6', unlock: 'warden_forge',
     text: 'Start each run with 2 extra sockets on random cards. Your gemmed cards have +1 Power.',
-    deck: ['recruit', 'clockwork_squire', 'spearman', 'tinker', 'scrap_thrower', 'guardian', 'siegecrafter', 'watchtower', 'catapult', 'hill_ogre', 'bulwark_golem', 'stone_giant'],
+    deck: ['recruit', 'clockwork_squire', 'spearman', 'forge_guard', 'slinger', 'guardian', 'siegecrafter', 'watchtower', 'catapult', 'hill_ogre', 'bulwark_golem', 'stone_giant'],
     relic: 'whetstone',
     art: { f: 'hum', hat: 'goggles', item: 'hammer', pal: 'steel', bg: 'workshop' },
     ongoing(b) { for (const c of b.allCards()) if ((c.inst?.sockets || []).some(Boolean)) b.aura(c, 1); },

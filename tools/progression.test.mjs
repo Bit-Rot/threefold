@@ -4,6 +4,7 @@ import { defaultMeta } from '../src/core/save.js';
 import { CARDS, CARD_LIST, TRIBES } from '../src/data/cards.js';
 import { BOSS_ORDER, OPPONENTS } from '../src/data/enemies.js';
 import { EVENTS } from '../src/data/events.js';
+import { WARDEN_LIST } from '../src/data/wardens.js';
 import { Battle, DRAW_PER_TURN, MAX_HAND } from '../src/engine/battle.js';
 import * as R from '../src/engine/run.js';
 
@@ -93,7 +94,7 @@ test('map migration updates unstarted stages and preserves a route already in us
   run.map.rows.shift();
   R.migrateRun(run);
   assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
-  assert.equal(run.v, 3);
+  assert.equal(run.v, 4);
 
   run.v = 2;
   run.map.rows.shift();
@@ -122,6 +123,81 @@ test('every boss has a complete deck and can resolve a battle', () => {
     assert.equal(battle.over, true);
     assert.equal(battle.result.laneResults.length, 3);
   }
+});
+
+test('Junk cards leave the card catalogue, decks, and existing saved offers', () => {
+  assert.ok(CARD_LIST.every((card) => !/\bjunk\b/i.test(card.text)));
+  for (const { deck } of [...WARDEN_LIST, ...Object.values(OPPONENTS)]) {
+    assert.equal(deck.length, 12);
+    assert.ok(deck.every((id) => CARDS[id]));
+  }
+
+  const run = newRun();
+  const [[battle], , , [boss]] = run.map.rows;
+  run.v = 3;
+  run.pos = boss.id;
+  run.node = { id: boss.id, type: 'boss', done: true };
+  run.pendingReward = { cards: ['avalanche', 'echo_bard', 'grand_choir'], bossRelics: ['star_map'] };
+  const [card] = run.deck;
+  Object.assign(card, { id: 'tinker', plus: 1, bonus: 2, sockets: ['ember', null] });
+  const savedCard = { ...card, id: 'twin_blades' };
+  R.migrateRun(run);
+  assert.deepEqual(run.deck[0], savedCard);
+  assert.deepEqual(R.nodeById(run, battle.id), battle);
+  assert.equal(run.pendingReward.kind, 'boss');
+  assert.deepEqual(run.pendingReward.bossRelics, ['star_map']);
+  assert.ok(run.pendingReward.cards.every((id) => CARDS[id]?.rarity === 'rare'));
+  assert.ok(run.pendingReward.cards.some((id) => CARDS[id].cost <= 2));
+  const saved = structuredClone(run);
+  R.migrateRun(run);
+  assert.deepEqual(run, saved);
+
+  run.v = 3;
+  run.pendingReward = null;
+  const items = [{ kind: 'card', id: 'scrap_thrower', price: 41, sold: false }];
+  run.node = { type: 'shop', done: false, shop: { items } };
+  R.migrateRun(run);
+  assert.deepEqual(items, [{ kind: 'card', id: 'slinger', price: 41, sold: false }]);
+});
+
+test('fight rewards spread across energy costs and keep the encounter rarity floor', () => {
+  const band = (id) => Math.ceil(CARDS[id].cost / 2);
+  const floors = { battle: ['common', 'uncommon', 'rare', 'legendary'], elite: ['uncommon', 'rare', 'legendary'], boss: ['rare', 'legendary'] };
+  for (const [kind, rarities] of Object.entries(floors)) {
+    const run = newRun();
+    const twoCardBands = new Set();
+    for (let count = 2; count <= 4; count++) {
+      for (let i = 0; i < 24; i++) {
+        const choices = R.rollRewardCards(run, kind, count);
+        assert.equal(new Set(choices).size, count);
+        assert.ok(choices.every((id) => rarities.includes(CARDS[id].rarity)));
+        const bands = [...new Set(choices.map(band))].sort();
+        if (count === 2) {
+          assert.equal(bands.length, 2);
+          assert.equal(bands[0], 1);
+          twoCardBands.add(bands[1]);
+        } else {
+          assert.deepEqual(bands, [1, 2, 3]);
+        }
+      }
+    }
+    assert.deepEqual([...twoCardBands].sort(), [2, 3]);
+  }
+
+  const run = newRun();
+  run.banishes = 2;
+  const [, , , [boss]] = run.map.rows;
+  R.applyBattle(run, defaultMeta(), boss, { won: true, lanesWon: 2, gold: 10 });
+  const { cards } = run.pendingReward;
+  const index = cards.findIndex((id) => band(id) === 1);
+  const original = cards.slice();
+  assert.equal(R.banishRewardCard(run, index), original[index]);
+  assert.notEqual(cards[index], original[index]);
+  assert.equal(band(cards[index]), 1);
+  assert.deepEqual(cards.filter((_, i) => i !== index), original.filter((_, i) => i !== index));
+  R.banishRewardCard(run, index);
+  assert.equal(new Set(cards).size, 3);
+  assert.ok(cards.every((id) => CARDS[id].rarity === 'rare' && !run.banished.includes(id)));
 });
 
 test('shop gems are charged only once and only when an eligible card is socketed', () => {

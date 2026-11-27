@@ -20,8 +20,8 @@ opp('magpie', 'Magpie Hoard', 'Greedy collectors', 'hoarder', 'basic', [1, 2],
   ['recruit', 'golden_hen', 'prospector', 'scholar', 'alchemist', 'twin_blades', 'spearman', 'mimic', 'guardian', 'gold_golem', 'hill_ogre', 'merchant'],
   { text: 'Draws deep and copies your best card.' });
 opp('soot_works', 'Soot Works', 'Clanking machinery', 'factory', 'basic', [1, 2, 3],
-  ['clockwork_squire', 'clockwork_squire', 'scrap_thrower', 'tinker', 'spearman', 'watchtower', 'scrap_golem', 'guardian', 'cog_marshal', 'catapult', 'hill_ogre', 'stone_giant'],
-  { text: 'Throws Junk into your lanes.' });
+  ['clockwork_squire', 'clockwork_squire', 'forge_guard', 'twin_blades', 'spearman', 'watchtower', 'ice_sentry', 'guardian', 'cog_marshal', 'catapult', 'hill_ogre', 'stone_giant'],
+  { text: 'Groups Constructs to strengthen them.' });
 // ---- Act 2–3 ----
 opp('siege_crew', 'Siege Crew', 'Artillery corps', 'siege', 'basic', [2, 3],
   ['arbalest', 'arbalest', 'slinger', 'saboteur', 'ballista', 'siegecrafter', 'guardian', 'catapult', 'hill_ogre', 'thunder_hawk', 'storm_caller', 'stone_giant'],
@@ -36,8 +36,8 @@ opp('hex_coven', 'Hex Coven', 'Whispers and ash', 'reel', 'basic', [2, 3],
   ['ember_wisp', 'hex_scribe', 'rag_picker', 'whisper_rat', 'wailing_shade', 'scholar', 'ghost_lantern', 'drummer', 'bonfire_hag', 'hill_ogre', 'void_oracle', 'stone_giant'],
   { text: 'Discards for value.' });
 opp('scrap_hauler', 'Scrap Haulers', 'Garbage gang', 'junkline', 'basic', [3],
-  ['scrap_thrower', 'scrap_thrower', 'scrap_thrower', 'tinker', 'clockwork_squire', 'scrap_golem', 'scrap_golem', 'guardian', 'catapult', 'hill_ogre', 'avalanche', 'stone_giant'],
-  { text: 'Buries your lanes in Junk.' });
+  ['clockwork_squire', 'spearman', 'forge_guard', 'slinger', 'twin_blades', 'ice_sentry', 'watchtower', 'guardian', 'catapult', 'hill_ogre', 'bulwark_golem', 'stone_giant'],
+  { text: 'Defends its lanes with Constructs and heavy artillery.' });
 
 // ---- Elites (stronger decks + a passive) ----
 opp('elite_ram', 'Siege Ram', 'Elite', 'siege', 'elite', [1, 2, 3],
@@ -47,7 +47,7 @@ opp('elite_bandit', 'Bandit Engine', 'Elite', 'reel', 'elite', [1, 2, 3],
   ['prospector', 'golden_hen', 'alchemist', 'scholar', 'mimic', 'echo_bard', 'guardian', 'merchant', 'hill_ogre', 'gilded_dragon', 'sun_titan', 'stone_giant'],
   { text: 'Passive: draws an extra card each turn.', turnStart(b) { if (b.turn > 1) b.drawCards(1); } });
 opp('elite_hauler', 'Scrap Colossus', 'Elite', 'junkline', 'elite', [2, 3],
-  ['scrap_thrower', 'scrap_thrower', 'tinker', 'clockwork_squire', 'scrap_golem', 'cog_marshal', 'guardian', 'catapult', 'avalanche', 'bulwark_golem', 'mountain_king', 'stone_giant'],
+  ['slinger', 'forge_guard', 'twin_blades', 'clockwork_squire', 'ice_sentry', 'cog_marshal', 'guardian', 'catapult', 'storm_caller', 'bulwark_golem', 'mountain_king', 'stone_giant'],
   { text: 'Passive: start of fight, a Junk appears on your side of every lane.', battleStart(b) { for (let i = 0; i < 3; i++) b.spawn('junk', i, 0, 0); } });
 opp('elite_leech', 'Leech Queen', 'Elite', 'leech', 'elite', [2, 3],
   ['ashling', 'ashling', 'cinder_imp', 'pyre_priest', 'gravedigger', 'grave_knight', 'phoenix_chick', 'soulbinder', 'hill_ogre', 'bone_colossus', 'abyss_maw', 'ashen_phoenix'],
@@ -64,13 +64,13 @@ opp('boss_archivist', 'The Pale Archivist', 'Boss 2', 'archivist', 'boss', [2],
   ['sprite', 'lamplighter', 'hearth_cook', 'scholar', 'twin_blades', 'lantern_keeper', 'oathkeeper', 'hourglass_sage', 'sage_elder', 'time_weaver', 'guardian', 'void_oracle'],
   { boss: 'archivist' });
 opp('boss_rust', 'The Rust Monarch', 'Boss 3', 'rust_monarch', 'boss', [3],
-  ['clockwork_squire', 'recruit', 'scrap_thrower', 'scrap_thrower', 'tinker', 'watchtower', 'scrap_golem', 'cog_marshal', 'guardian', 'catapult', 'hill_ogre', 'avalanche'],
+  ['clockwork_squire', 'recruit', 'forge_guard', 'slinger', 'twin_blades', 'watchtower', 'ice_sentry', 'cog_marshal', 'guardian', 'catapult', 'hill_ogre', 'stone_giant'],
   { boss: 'rust' });
 opp('boss_brood', 'Brood Mother', 'Boss 4', 'brood', 'boss', [4],
   ['blink_fox', 'cinder_imp', 'pack_alpha', 'lone_wolf', 'beast_tamer', 'salamander', 'thunder_hawk', 'tide_turtle', 'hill_ogre', 'starlit_unicorn', 'moon_howler', 'elder_dragon'],
   { boss: 'brood' });
 opp('boss_frost', 'The Frost Regent', 'Boss 5', 'frost_regent', 'boss', [5],
-  ['sprite', 'mossling', 'arbalest', 'spearman', 'wind_dancer', 'frost_witch', 'frost_witch', 'guardian', 'tide_turtle', 'crystal_golem', 'storm_caller', 'avalanche'],
+  ['sprite', 'mossling', 'arbalest', 'spearman', 'wind_dancer', 'frost_witch', 'frost_witch', 'guardian', 'tide_turtle', 'crystal_golem', 'storm_caller', 'stone_giant'],
   { boss: 'frost' });
 opp('boss_leviathan', 'The Gilded Leviathan', 'Boss 6', 'leviathan', 'boss', [6],
   ['blink_fox', 'cinder_imp', 'recruit', 'golden_hen', 'pack_alpha', 'wind_dancer', 'drummer', 'riptide_siren', 'gale_rider', 'thunder_hawk', 'starlit_unicorn', 'gilded_dragon'],
@@ -79,7 +79,7 @@ opp('boss_furnace', 'The Furnace Warden', 'Boss 7', 'furnace_warden', 'boss', [7
   ['ashling', 'cinder_imp', 'arbalest', 'pyre_priest', 'spearman', 'saboteur', 'siegecrafter', 'ballista', 'catapult', 'soulbinder', 'storm_caller', 'doom_trebuchet'],
   { boss: 'furnace' });
 opp('boss_engine', 'The Grand Engine', 'Boss 8', 'engine', 'boss', [8],
-  ['clockwork_squire', 'tinker', 'siegecrafter', 'cog_marshal', 'scrap_golem', 'catapult', 'crystal_golem', 'bulwark_golem', 'avalanche', 'doom_trebuchet', 'mountain_king', 'stone_giant'],
+  ['clockwork_squire', 'forge_guard', 'siegecrafter', 'cog_marshal', 'ice_sentry', 'catapult', 'crystal_golem', 'bulwark_golem', 'sun_titan', 'doom_trebuchet', 'mountain_king', 'stone_giant'],
   { boss: 'engine' });
 
 export const OPPONENTS = O;
