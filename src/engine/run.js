@@ -4,7 +4,7 @@ import { GEM_LIST, GEMS } from '../data/gems.js';
 import { RELIC_LIST, RELICS, RELIC_PRICE } from '../data/relics.js';
 import { LOCATION_LIST } from '../data/locations.js';
 import { HOME_LIST, HOME_UPGRADES } from '../data/home.js';
-import { ACT_POOLS, BOSSES, ENEMY_TYPES } from '../data/enemies.js';
+import { ACT_POOLS, BOSSES, OPPONENTS, BOSS_BY_ACT } from '../data/enemies.js';
 import { WARDENS } from '../data/wardens.js';
 import { EVENTS } from '../data/events.js';
 import { UNLOCK_MAP } from '../data/meta.js';
@@ -124,29 +124,22 @@ export function availableNodes(run) {
   return cur ? cur.next : [];
 }
 
-function heatMult(run) { let m = 1; if (run.heat >= 1) m += 0.1; if (run.heat >= 8) m += 0.1; return m; }
-
 export function makeEncounter(run, act, node) {
   const rng = rngFor(run);
   const pools = ACT_POOLS[act];
   const set = new Set(run.unlocked);
   const locs = LOCATION_LIST.filter((l) => open(set, l.unlock) && l.id !== 'open_field');
-  const pickLocs = () => { const two = rng.sample(locs, 2); return [two[0].id, null, rng.chance(0.15) ? 'open_field' : two[1].id]; };
-  const actBase = [0.62, 1.0, 1.45][act - 1];
-  if (node.type === 'boss') {
-    const boss = Object.values(BOSSES).find((b) => b.act === act);
-    let scale = [0.9, 1.25, 1.6][act - 1] * heatMult(run) * (run.heat >= 5 ? 1.15 : 1);
-    return { kind: 'boss', boss: boss.id, enemies: boss.enemies.slice(), locs: pickLocs(), scale };
-  }
-  const rowF = node.row >= 2 ? 1.18 : 1;
-  if (node.type === 'elite') {
-    const el = rng.sample(pools.elite, 2);
-    const ba = rng.pick(pools.basic.filter((t) => !el.includes(t)));
-    const enemies = rng.shuffle([...el, ba]);
-    return { kind: 'elite', enemies, locs: pickLocs(), scale: actBase * rowF * 1.15 * heatMult(run) * (run.heat >= 3 ? 1.15 : 1) };
-  }
-  const enemies = rng.sample(pools.basic, 3);
-  return { kind: 'battle', enemies, locs: pickLocs(), scale: actBase * rowF * heatMult(run) };
+  const two = rng.sample(locs, 2);
+  const locIds = [two[0].id, null, rng.chance(0.12) ? 'open_field' : two[1].id];
+  // opponents scale by act: +1 Power per act after the first, plus upgraded cards from act 3
+  let bonus = Math.max(0, act - 2) + (run.heat >= 8 ? 1 : 0);
+  const enemyStartBonus = run.heat >= 1 ? 1 : 0;
+  if (node.type === 'boss') return { kind: 'boss', opponent: BOSS_BY_ACT[act], locs: locIds, bonus: bonus + (run.heat >= 5 ? 1 : 0), plus: act >= 2, enemyStartBonus };
+  if (node.type === 'elite') return { kind: 'elite', opponent: rng.pick(pools.elite), locs: locIds, bonus: bonus + (run.heat >= 3 ? 1 : 0), plus: act >= 2, enemyStartBonus };
+  const used = run._usedOpp || (run._usedOpp = []);
+  const fresh = pools.basic.filter((id) => !used.includes(id));
+  const pick = rng.pick(fresh.length ? fresh : pools.basic); used.push(pick); if (used.length > 6) used.shift();
+  return { kind: 'battle', opponent: pick, locs: locIds, bonus, plus: act >= 3, enemyStartBonus };
 }
 
 // ---------- pools ----------
@@ -368,4 +361,4 @@ export function endRun(run, meta) {
   return { victory, shards: run.shards, bonus };
 }
 
-export { ENEMY_TYPES, BOSSES };
+export { OPPONENTS, BOSSES };

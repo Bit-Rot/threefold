@@ -12,7 +12,7 @@ home('war_room', 'War Room', 'The first card you play in your Home each turn cos
 home('vault', 'Vault', '+10% gold from fights.', 'chest', { stack: true, goldMult: 0.1 });
 home('shrine', 'Shrine', 'Your Ongoing cards in your Home have +2 Power.', 'temple', { ongoing(b, lane) { lane.flags.ongoingBonus += 2; } });
 home('echo_chamber', 'Echo Chamber', 'The first On Reveal in your Home each fight triggers twice.', 'bell', { echoFirst: true });
-home('moat', 'Moat', 'The enemy facing your Home gains 1 less each turn.', 'wave', { stack: true, ongoing(b, lane) { lane.flags.gainReduce += 1; } });
+home('moat', 'Moat', 'Enemy cards in your Home have -1 Power.', 'wave', { stack: true, ongoing(b, lane) { for (const c of b.foesIn(lane.idx)) b.aura(c, -1); } });
 home('training_yard', 'Training Yard', 'End of turn: a random card in your Home gets +1.', 'sword', {
   stack: true, endTurn(b, lane) { const m = mine(b, lane); if (m.length) b.buff(b.rng.pick(m), 1); },
 });
@@ -26,13 +26,13 @@ home('garden', 'Hearth Garden', 'Win your Home lane: a random card there permane
     if (m.length) { const c = b.rng.pick(m); c.inst.bonus = (c.inst.bonus || 0) + 1; r.notes = (r.notes || []).concat(`${c.def.name} grew +1 permanently`); }
   },
 });
-home('bell_tower', 'Bell Tower', 'Turn 1: Freeze the enemy facing your Home.', 'bell', { battleStart(b, lane) { b.freeze(lane.idx); } });
+home('bell_tower', 'Bell Tower', "Turn 1: Your opponent can't play cards in your Home.", 'bell', { battleStart(b, lane) { b.freeze(lane.idx); } });
 home('library', 'Reading Room', 'The first card you play in your Home each turn draws a card.', 'book', {
-  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.playedHereThisTurn === 0) b.drawCards(1); },
+  onPlay(b, lane, bc) { if (bc.lane === lane.idx && lane.revealedHereThisTurn === 0) b.drawCards(1); },
 });
 home('ramparts', 'Ramparts', "Your cards in your Home can't be destroyed or weakened.", 'shield', { ongoing(b, lane) { lane.flags.protect = true; } });
 home('beacon_spire', 'Beacon Spire', 'Your cards in the outer lanes have +1 Power if you are winning your Home.', 'tower', {
-  ongoing(b, lane) { /* evaluated with last totals to avoid loops */ if (lane.total > lane.enemy.display(b, lane)) for (const c of b.allCards()) if (c.lane !== lane.idx) b.aura(c, 1); },
+  ongoing(b, lane) { /* uses last computed totals */ if (b.winning(lane.idx)) for (const c of b.allCards()) if (c.lane !== lane.idx) b.aura(c, 1); },
 });
 
 export const HOME_UPGRADES = Object.fromEntries(H.map((h) => [h.id, h]));

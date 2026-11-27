@@ -41,12 +41,12 @@ export const UNLOCKS = [
 export const UNLOCK_MAP = Object.fromEntries(UNLOCKS.map((u) => [u.id, u]));
 
 export const HEAT = [
-  { lvl: 1, text: 'Enemies are 10% stronger.' },
+  { lvl: 1, text: 'Opponents start with 1 extra card in hand.' },
   { lvl: 2, text: 'Shops cost 15% more.' },
-  { lvl: 3, text: 'Elites are 15% stronger.' },
+  { lvl: 3, text: "Elites' cards have +1 Power." },
   { lvl: 4, text: 'Start with a Junk in your deck.' },
-  { lvl: 5, text: 'Bosses are 15% stronger.' },
+  { lvl: 5, text: "Bosses' cards have +1 Power." },
   { lvl: 6, text: 'Card rewards offer one fewer choice.' },
   { lvl: 7, text: 'Start with 1 fewer heart.' },
-  { lvl: 8, text: 'Enemies are a further 10% stronger.' },
+  { lvl: 8, text: "All opponents' cards have +1 Power." },
 ];

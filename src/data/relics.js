@@ -7,12 +7,12 @@ const tribeRelic = (id, name, tribe, icon) => relic(id, name, 'common', `Your ${
 });
 
 relic('lucky_coin', 'Lucky Coin', 'common', '+15% gold from fights.', 'coin', { goldMult: 0.15 });
-relic('satchel', 'Spare Satchel', 'uncommon', '+1 Hold slot.', 'bag', { holdBonus: 1 });
+relic('satchel', 'Spare Satchel', 'uncommon', 'Start each fight with 1 extra card in hand.', 'bag', { startCards: 1 });
 relic('kindling', 'Kindling', 'common', 'Turn 1: +1 Energy.', 'flame', { turnStart(b) { if (b.turn === 1) b.gainEnergy(1); } });
 relic('hourglass', 'Last Light', 'uncommon', 'Final turn: +2 Energy.', 'hourglass', { turnStart(b) { if (b.turn === b.maxTurns) b.gainEnergy(2); } });
 relic('whetstone', 'Whetstone', 'common', 'Your Strikes deal +1.', 'blade', { strikeBonus: 1 });
 relic('war_horn', 'War Horn', 'uncommon', 'The first card you play each fight costs 0.', 'horn', {
-  costMod(b, hc) { return b.playedAll.length === 0 ? -99 : 0; },
+  costMod(b, hc) { return b.S[0].cardsPlayedTotal === 0 ? -99 : 0; },
 });
 relic('second_wind', 'Second Wind', 'rare', 'The first fight you lose each act costs no heart.', 'feather');
 relic('crown_thirds', 'Crown of Thirds', 'uncommon', 'Win all 3 lanes: +25 gold.', 'crown', {
@@ -24,7 +24,7 @@ relic('anchor_stone', 'Anchor Stone', 'common', 'Your 4+ cost cards have +1 Powe
 relic('feather_charm', 'Feather Charm', 'common', 'Cards played on turns 1–2 get +1 Power.', 'feather', {
   onPlay(b, bc) { if (b.turn <= 2) b.buff(bc, 1, true); },
 });
-relic('patience_stone', 'Patience Stone', 'uncommon', 'Held cards cost 1 less.', 'stone', { costMod(b, hc) { return hc.wasHeld ? -1 : 0; } });
+relic('patience_stone', 'Patience Stone', 'uncommon', 'Cards that spent 2+ turns in your hand cost 1 less.', 'stone', { costMod(b, hc) { return (hc.age || 0) >= 2 ? -1 : 0; } });
 relic('bone_charm', 'Bone Charm', 'uncommon', 'When one of your cards is destroyed, +1 Energy next turn (max 2 per turn).', 'skull', {
   onAnyDestroyed(b, bc) { if (bc.token) return; const k = 'bone' + b.turn; b.flags[k] = (b.flags[k] || 0) + 1; if (b.flags[k] <= 2) b.gainEnergyNext(1); },
 });
@@ -32,11 +32,11 @@ relic('ember_heart', 'Ember Heart', 'common', 'End of turn: Strike 1 in a random
 relic('iron_banner', 'Iron Banner', 'uncommon', 'Your Ongoing cards have +1 Power.', 'banner', {
   ongoing(b) { for (const l of b.lanes) l.flags.ongoingBonus += 1; },
 });
-relic('scroll_case', 'Scroll Case', 'common', 'Turn 1: draw 2 extra cards.', 'scroll', { handBonus(b) { return b.turn === 1 ? 2 : 0; } });
-relic('deep_pockets', 'Deep Pockets', 'rare', 'Draw 6 cards each turn instead of 5.', 'bag', { handBonus() { return 1; }, unlock: 'relics_rare' });
+relic('scroll_case', 'Scroll Case', 'common', 'Start each fight with 2 extra cards in hand.', 'scroll', { startCards: 2 });
+relic('deep_pockets', 'Deep Pockets', 'rare', 'Draw 2 cards each turn instead of 1.', 'bag', { drawBonus: 1, unlock: 'relics_rare' });
 relic('star_map', 'Star Map', 'uncommon', 'Card rewards offer 4 choices.', 'map', { rewardBonus: 1 });
 relic('ledger', "Merchant's Ledger", 'common', 'Shop prices are 20% lower.', 'book', { shopDiscount: 0.2 });
-relic('ice_shard', 'Ice Shard', 'uncommon', 'Turn 1: Freeze a random enemy lane.', 'crystal', { battleStart(b) { b.freeze(b.rng.int(0, 2)); } });
+relic('ice_shard', 'Ice Shard', 'uncommon', "Turn 1: your opponent can't play cards in a random lane.", 'crystal', { battleStart(b) { b.freeze(b.rng.int(0, 2)); } });
 relic('phoenix_feather', 'Phoenix Feather', 'rare', 'The first card of yours destroyed each fight returns to your hand.', 'feather', {
   unlock: 'relics_rare',
   onAnyDestroyed(b, bc) { if (bc.token || b.flags.pf || !bc.inst || bc.inst.temp) return; b.flags.pf = true; if (b.addToHand(bc.def, bc.inst)) bc.returned = true; },
@@ -55,9 +55,7 @@ relic('echo_shell', 'Echo Shell', 'rare', 'The first On Reveal you play each tur
 relic('sharp_arrow', 'Fletching', 'common', 'Your 1-cost cards have +1 Power.', 'arrow', {
   ongoing(b) { for (const c of b.allCards()) if (c.def.cost === 1) b.aura(c, 1); },
 });
-relic('quiet_bell', 'Quiet Bell', 'uncommon', "Each enemy lane's first action each fight is skipped.", 'bell', {
-  battleStart(b) { for (let i = 0; i < 3; i++) b.lanes[i].enemy.frozen = Math.max(1, b.lanes[i].enemy.frozen || 0); },
-});
+relic('quiet_bell', 'Quiet Bell', 'uncommon', 'Your opponent starts each fight with 1 fewer card in hand.', 'bell', { enemyStartMinus: 1 });
 relic('overflow_urn', 'Overflow Urn', 'rare', 'Unspent Energy carries over to next turn (up to 2).', 'urn', { bank: 2, unlock: 'relics_rare' });
 relic('ox_yoke', 'Ox Yoke', 'rare', 'Your outer lanes have +1 slot.', 'yoke', { outerCap: 1 });
 relic('sanctum_key', 'Sanctum Key', 'uncommon', 'Heal 1 heart after defeating a boss.', 'key', { afterBoss(run) { run.hearts = Math.min(run.maxHearts, run.hearts + 1); } });

@@ -35,7 +35,7 @@ async def main():
                 await pg.click(f'.hc[data-hid="{hid}"]'); await pg.wait_for_timeout(150)
                 pos = await pg.evaluate(f"""() => {{ const G=window.__G; const c=document.getElementById('gl').getBoundingClientRect(); return null; }}""")
                 # tap lane: compute screen x from lane index
-                box = await pg.evaluate("""(lane) => { const c=document.getElementById('gl').getBoundingClientRect(); return [c.left + c.width*[0.2,0.5,0.8][lane], c.top + c.height*0.75]; }""", lane)
+                box = await pg.evaluate("""(lane) => { const c=document.getElementById('gl').getBoundingClientRect(); const G=window.__G; return [c.left + c.width/2 + [-1,0,1][lane]*Math.min(c.width*0.3, c.height*0.28), c.top + c.height*0.78]; }""", lane)
                 await pg.mouse.click(box[0], box[1]); await pg.wait_for_timeout(250)
             if turn == 2:
                 await pg.screenshot(path=f'shots/{TAG}_battle2.png')

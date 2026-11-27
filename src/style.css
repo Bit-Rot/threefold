@@ -224,6 +224,7 @@ img.card { width: 100%; display: block; border-radius: 6%; cursor: pointer; }
   .hrt { width: 18px; height: 18px; }
   .pill { font-size: 12px; padding: 2px 6px; }
   .pill.act, .pill.gems { display: none; }
+  .battle-top .pill.gold { display: none; }
   .relic { width: 26px; height: 26px; }
   .handbar { height: clamp(140px, 24vh, 190px); gap: 4px; padding: 6px; }
   .orb { width: 46px; height: 46px; } .orb b { font-size: 20px; }
@@ -240,3 +241,23 @@ img.card { width: 100%; display: block; border-radius: 6%; cursor: pointer; }
   .maprow { height: 70px; }
   .panel { padding: 12px; }
 }
+
+/* symmetric battle additions */
+.oppinfo { display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(60, 8, 20, 0.6); border: 1px solid #ff6080; border-radius: 12px; padding: 2px 8px 2px 2px; }
+.oppinfo img { width: 36px; height: 36px; border-radius: 9px; }
+.oppinfo span { display: flex; flex-direction: column; line-height: 1.1; font-size: 13px; }
+.oppinfo small { font-size: 11px; }
+.ptotal.enemy { background: radial-gradient(circle at 35% 30%, #8a3a4a, #3a0c18); border-color: #ff8090; }
+.ptotal.enemy.ewin { background: radial-gradient(circle at 35% 30%, #e05060, #6a0c20); border-color: #ffc0c8; }
+.lr.t { border-color: var(--gold); }
+.lanelabel.frozen { background: rgba(20, 70, 100, 0.8); }
+.opp-row { display: flex; gap: 10px; align-items: center; text-align: left; }
+.opp-row img { width: 72px; height: 72px; border-radius: 12px; border: 2px solid #ff6080; flex-shrink: 0; }
+.opp-row p { margin: 2px 0; font-size: 14px; color: var(--dim); }
+.enemy-entry.elite img { border-color: #ff9040; }
+@media (max-width: 640px) {
+  .oppinfo span small { display: none; }
+  .oppinfo img { width: 30px; height: 30px; }
+  .battle-top .turn { font-size: 15px; }
+}
+@media (max-width: 640px) { .handside small { display: none; } }

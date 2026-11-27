@@ -7,7 +7,7 @@ import { GEMS, GEM_LIST } from './data/gems.js';
 import { RELICS, RELIC_LIST } from './data/relics.js';
 import { LOCATIONS, LOCATION_LIST } from './data/locations.js';
 import { HOME_UPGRADES } from './data/home.js';
-import { ENEMY_TYPES, BOSSES } from './data/enemies.js';
+import { OPPONENTS, BOSSES } from './data/enemies.js';
 import { WARDENS, WARDEN_LIST } from './data/wardens.js';
 import { EVENTS } from './data/events.js';
 import { UNLOCKS, UNLOCK_MAP, HEAT } from './data/meta.js';
@@ -111,10 +111,9 @@ SCREENS.title = () => {
 
 SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <h2>How to Play</h2>
-  <p><b>Fights.</b> The board has three lanes. You play cards with <b>Power</b> into your side of each lane. The far side of every lane is an enemy <b>machine</b> that generates points each turn, each borrowed from a different genre (a marching horde, a compounding factory, a slot machine, a drum beat…). After 6 turns, win a lane by having more Power than its machine. <b>Win 2 of 3 lanes to win the fight.</b></p>
-  <p><b>Turns.</b> Each turn you draw a fresh hand of 5 and gain Energy (3, 3, 4, 4, 5, 6). Unplayed cards are discarded at end of turn, except cards you <b>Hold</b> (tap the 🔒 on a card). The middle lane is your <b>Home</b>: upgrade it over the run.</p>
-  <p><b>Intents.</b> Every machine shows what it will do at the end of the turn. Use <b>Strike</b> to knock points off a machine, <b>Freeze</b> to make it skip an action, and Ongoing effects to blunt it.</p>
-  <p><b>Keywords.</b> <b>On Reveal</b>: triggers when played. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when discarded from your hand. <b>Junk</b>: clutter that fills your slots.</p>
+  <p><b>Fights.</b> You and an opponent each play cards with <b>Power</b> into your own side of three lanes. After 6 turns, whoever has more Power in a lane wins it. <b>Win 2 of 3 lanes to win the fight</b> (if lanes are tied, total Power decides).</p>
+  <p><b>Turns.</b> Your Energy each turn equals the turn number (1 on turn 1, 6 on turn 6). You start with 3 cards and draw 1 each turn; your hand holds up to 7. Cards you play are placed face-down and <b>reveal at the end of the turn</b>, at the same time as your opponent's. Whoever is winning more lanes reveals first. Tap a face-down card to take it back. The middle lane is your <b>Home</b>: upgrade it over the run.</p>
+  <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when discarded from your hand. <b>Junk</b>: 0-Power clutter that fills slots.</p>
   <p><b>The run.</b> Three acts, each ending in a boss. After every fight you <b>must</b> add a card. Shape your deck at Shops, Forges (socket gems, Evolve, Fuse duplicates), Shrines (remove), Mirror Pools (clone) and Campfires (upgrade or heal). Lose a fight and you lose a heart; lose all hearts and the run ends.</p>
   <p><b>Gold</b> = the total Power in the lanes you win. <b>Shards</b> are kept between runs; spend them in the Archive on new wardens, card caches, gems, relics, locations and perks.</p>
   <p><b>Evolution.</b> Socket an <b>Evo Gem</b> into an empty socket on an Evo base card. If you also own its catalyst card, the Forge can evolve it: the catalyst is consumed and the base becomes something new.</p>
@@ -168,9 +167,9 @@ SCREENS.map = () => {
   </div>`;
 };
 function encPreview(enc, showLocs) {
-  const boss = enc.boss ? BOSSES[enc.boss] : null;
-  return `<div class="enc">${boss ? `<p class="bossrule">⚠ ${esc(boss.text)}</p>` : ''}
-    <div class="enc-lanes">${enc.enemies.map((id, i) => `<div class="enc-lane"><img src="${enemyURL(id)}"><b>${esc(ENEMY_TYPES[id].name)}</b><small>${esc(ENEMY_TYPES[id].genre)}</small>${showLocs ? `<small class="loc">${i === 1 ? 'Home' : esc(LOCATIONS[enc.locs[i]]?.name)}</small>` : ''}</div>`).join('')}</div></div>`;
+  const o = OPPONENTS[enc.opponent]; const boss = o.boss ? BOSSES[o.boss] : null;
+  return `<div class="enc"><div class="opp-row"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${esc(o.title)}</small><p>${esc(boss ? boss.text : o.text || '')}</p></div></div>
+    ${showLocs ? `<p class="dim">Locations: ${esc(LOCATIONS[enc.locs[0]]?.name)} · Home · ${esc(LOCATIONS[enc.locs[2]]?.name)}</p>` : ''}</div>`;
 }
 function drawMapLines() {
   const svg = $('#maplines'); if (!svg || !G.run) return;
@@ -198,6 +197,7 @@ SCREENS.battle = () => {
   return `<div class="topbar battle-top" id="topbar">
       <div class="tb-left"><span class="hearts">${heartIcons(r)}</span><span class="pill gold"><img src="${glyphURL('coin', 40)}">${r.gold}</span></div>
       <div class="turn">Turn <b>${Math.min(b.turn, b.maxTurns)}</b>/${b.maxTurns}</div>
+      <div class="oppinfo" data-a="oppInfo"><img src="${enemyURL(b.opp.portrait)}"><span><b>${esc(b.opp.name)}</b><small>Hand ${b.S[1].hand.length} · Deck ${b.S[1].deck.length}</small></span></div>
       <div class="tb-right"><button class="btn sm ghost" data-a="battleHelp">?</button></div>
     </div>
     <div id="hud"></div>
@@ -207,7 +207,7 @@ SCREENS.battle = () => {
       <div class="hand" id="hand">${b.hand.map((hc) => handCard(b, hc)).join('')}</div>
       <div class="handside">
         <button class="btn endturn ${b.over ? 'disabled' : ''}" data-a="endTurn">${b.turn >= b.maxTurns ? 'Finish' : 'End Turn'}</button>
-        <small>Draw ${b.drawPile.length} · Discard ${b.discardPile.length} · Hold ${b.hand.filter((h) => h.hold).length}/${b.holdSlots()}</small>
+        <small>Deck ${b.S[0].deck.length} · Hand ${b.S[0].hand.length}/7</small>
       </div>
     </div>
     ${b.over ? battleResultHtml() : ''}`;
@@ -215,20 +215,18 @@ SCREENS.battle = () => {
 function handCard(b, hc) {
   const cost = b.minCost(hc);
   const base = hc.def.cost + (hc.inst?.plus ? (hc.def.up?.cost ?? 0) : 0);
-  const playable = cost <= b.energy && [0, 1, 2].some((l) => b.canPlay(hc.hid, l).ok);
-  const pw = b.basePowerOf(hc.def, hc.inst) + (hc.extra || 0) + (hc.def.id === 'patient_monk' && hc.wasHeld ? 5 : 0);
-  return `<div class="hc ${G.sel === hc.hid ? 'sel' : ''} ${playable ? 'ok' : 'no'} ${hc.hold ? 'held' : ''}" data-hid="${hc.hid}">
+  const playable = [0, 1, 2].some((l) => b.canPlay(hc.hid, l).ok);
+  const pw = b.basePowerOf(hc.def, hc.inst) + (hc.extra || 0) + (hc.def.id === 'patient_monk' ? Math.min(6, hc.age || 0) : 0);
+  return `<div class="hc ${G.sel === hc.hid ? 'sel' : ''} ${playable ? 'ok' : 'no'}" data-hid="${hc.hid}">
     <img class="card" draggable="false" src="${cardURL(hc.def, { cost, plus: hc.inst?.plus, sockets: hc.inst?.sockets || [], bonus: hc.inst?.bonus, power: pw })}">
-    <button class="holdbtn ${hc.hold ? 'on' : ''}" data-a="hold" data-hid="${hc.hid}" title="Hold this card for next turn">${hc.hold ? '🔒' : '🔓'}</button>
-    ${hc.wasHeld ? '<span class="heldtag">Held</span>' : ''}
   </div>`;
 }
 function battleResultHtml() {
   const res = G.battle.result; const out = G.lastOutcome;
   return `<div class="overlay"><div class="panel result ${res.won ? 'win' : 'lose'}">
     <h2>${res.won ? 'Victory' : 'Defeat'}</h2>
-    <div class="lanes-res">${res.laneResults.map((lr, i) => `<div class="lr ${lr.won ? 'w' : 'l'}"><small>${i === 1 ? 'Home' : i === 0 ? 'Left' : 'Right'}</small><b>${lr.player}</b><span>vs</span><b>${lr.enemy >= 999 ? '✘' : lr.enemy}</b></div>`).join('')}</div>
-    <p>${res.lanesWon} of 3 lanes won.</p>
+    <div class="lanes-res">${res.laneResults.map((lr, i) => `<div class="lr ${lr.won ? 'w' : lr.lost ? 'l' : 't'}"><small>${i === 1 ? 'Home' : i === 0 ? 'Left' : 'Right'}</small><b>${lr.player}</b><span>vs</span><b>${lr.enemy}</b></div>`).join('')}</div>
+    <p>${res.lanesWon} won · ${res.lanesLost} lost${res.tiebreak ? ' — decided by total Power' : ''}.</p>
     ${out ? `<p class="gains"><span>+${out.gold} gold</span> <span>+${out.shards} ✦</span>${out.heartLost ? ' <span class="bad">−1 heart</span>' : ''}</p>
     ${out.relic ? `<p>Relic: <b>${esc(RELICS[out.relic].name)}</b></p>` : ''}${out.gem ? `<p>Gem: <b>${esc(GEMS[out.gem].name)}</b></p>` : ''}
     ${out.notes.map((n) => `<p class="dim">${esc(n)}</p>`).join('')}` : ''}
@@ -240,40 +238,36 @@ let hudEls = null;
 function afterBattleRender() {
   const hud = $('#hud'); if (!hud) return;
   const b = G.battle;
-  hud.innerHTML = [0, 1, 2].map((i) => `<div class="intent" id="int${i}"></div><div class="ptotal" id="pt${i}"></div><div class="lanelabel" id="ll${i}" data-a="laneInfo" data-lane="${i}"></div>`).join('');
-  hudEls = [0, 1, 2].map((i) => ({ intent: $('#int' + i), pt: $('#pt' + i), ll: $('#ll' + i) }));
+  hud.innerHTML = [0, 1, 2].map((i) => `<div class="ptotal" id="pt${i}"></div><div class="ptotal enemy" id="et${i}"></div><div class="lanelabel" id="ll${i}" data-a="laneInfo" data-lane="${i}"></div>`).join('');
+  hudEls = [0, 1, 2].map((i) => ({ pt: $('#pt' + i), et: $('#et' + i), ll: $('#ll' + i) }));
   updateHudContent();
   bindHand();
-  board.highlightLanes(G.sel ? [0, 1, 2].map((l) => b.canPlay(G.sel, l).ok) : G.moveSel ? [0, 1, 2].map((l) => l !== b.allCards().find((c) => c.bid === G.moveSel)?.lane && b.freeSlots(l) > 0) : null);
+  board.highlightLanes(G.sel ? [0, 1, 2].map((l) => b.canPlay(G.sel, l).ok) : G.moveSel ? [0, 1, 2].map((l) => l !== b.findCard(G.moveSel)?.lane && b.freeSlots(l, 0) > 0) : null);
 }
 function updateHudContent() {
   const b = G.battle; if (!b || !hudEls) return;
   b.lanes.forEach((lane, i) => {
-    const it = lane.enemy.intent(b, lane);
-    const fz = lane.enemy.frozen > 0;
-    hudEls[i].intent.innerHTML = `<img src="${glyphURL(it.icon || 'up', 40)}"><span>${fz ? '❄ Frozen · ' : ''}${esc(it.text)}</span>`;
-    hudEls[i].intent.className = 'intent' + (fz ? ' frozen' : '');
-    const e = lane.enemy.display(b, lane);
-    const win = lane.total > e;
-    hudEls[i].pt.innerHTML = `<b>${lane.total}</b>`;
-    hudEls[i].pt.className = 'ptotal ' + (win ? 'win' : lane.total === e ? 'tie' : 'lose');
+    const p = lane.totals[0], e = lane.totals[1];
+    hudEls[i].pt.innerHTML = `<b>${p}</b>`; hudEls[i].pt.className = 'ptotal ' + (p > e ? 'win' : p === e ? 'tie' : 'lose');
+    hudEls[i].et.innerHTML = `<b>${e}</b>`; hudEls[i].et.className = 'ptotal enemy ' + (e > p ? 'ewin' : '');
     const name = lane.isHome ? 'Home' : lane.loc.name;
-    const txt = lane.isHome ? (lane.home.length ? lane.home.map((h) => h.name).join(', ') : 'Your Home lane. Upgrade it at Builders.') : lane.loc.text;
-    hudEls[i].ll.innerHTML = `<b>${esc(name)}</b><small>${esc(txt)}</small><em>${esc(lane.enemy.name)}</em>`;
+    const txt = lane.isHome ? (lane.home.length ? lane.home.map((h) => h.name).join(', ') : 'Your Home lane') : lane.loc.text;
+    const frozen = lane.lock[0] === b.turn;
+    hudEls[i].ll.innerHTML = `<b>${frozen ? '❄ ' : ''}${esc(name)}</b><small>${frozen ? 'Frozen: you can\'t play here this turn' : esc(txt)}</small>`;
+    hudEls[i].ll.classList.toggle('frozen', frozen);
   });
 }
 function updateHud() {
   if (!hudEls || !G.battle) return;
+  const top = canvas.offsetTop;
   for (let i = 0; i < 3; i++) {
-    const a = board.toScreen(board.laneAnchor(i, 'enemy'));
-    const pIntent = board.toScreen(new THREE.Vector3([-3.7, 0, 3.7][i], 0.3, -3.65));
-    const p = board.toScreen(board.scoreAnchor(i, 'player'));
-    const l = board.toScreen(new THREE.Vector3([-3.7, 0, 3.7][i], 0.6, -1.65));
-    const top = canvas.offsetTop;
-    hudEls[i].intent.style.transform = `translate(${pIntent.x}px, ${pIntent.y + top}px) translate(-50%, -50%)`;
-    hudEls[i].pt.style.transform = `translate(${p.x}px, ${p.y + top + 6}px) translate(-50%, -50%)`;
+    const p = board.toScreen(board.totalAnchor(i, 0));
+    const e = board.toScreen(board.totalAnchor(i, 1));
+    const l = board.toScreen(board.labelAnchor(i));
+    hudEls[i].pt.style.transform = `translate(${p.x - 54}px, ${p.y + top}px) translate(-50%, -50%)`;
+    hudEls[i].et.style.transform = `translate(${e.x - 54}px, ${e.y + top}px) translate(-50%, -50%)`;
     hudEls[i].ll.style.transform = `translate(${l.x}px, ${l.y + top}px) translate(-50%, -50%)`;
-    hudEls[i].ll.style.maxWidth = Math.max(90, (board.toScreen(new THREE.Vector3([-3.7, 0, 3.7][i] + 1.5, 0.6, -1.65)).x - l.x) * 2) + 'px';
+    hudEls[i].ll.style.maxWidth = Math.max(80, Math.abs(board.toScreen(board.labelAnchor(i).setX(board.labelAnchor(i).x + 1.3)).x - l.x) * 2) + 'px';
   }
   if (floats.length) {
     const now = performance.now();
@@ -281,32 +275,35 @@ function updateHud() {
       const f = floats[i]; const age = (now - f.t0) / 1000;
       if (age < 0) { f.el.style.opacity = 0; continue; }
       if (age > 1.4) { f.el.remove(); floats.splice(i, 1); continue; }
-      const s = board.toScreen(board.laneAnchor(f.lane, f.side));
+      const s = board.toScreen(board.floatAnchor(f.lane, f.side));
       f.el.style.opacity = Math.min(1, 2.5 * (1.4 - age));
-      f.el.style.transform = `translate(${s.x + f.dx}px, ${s.y + canvas.offsetTop - 30 - age * 50}px) translate(-50%,-50%)`;
+      f.el.style.transform = `translate(${s.x + f.dx}px, ${s.y + top - 20 - age * 50}px) translate(-50%,-50%)`;
     }
   }
 }
 const floats = [];
 function addFloat(lane, side, text, color, delay) {
+  side = side === 'enemy' ? 1 : side === 'player' ? 0 : side;
   const hud = $('#hud'); if (!hud) return;
   const el = document.createElement('div'); el.className = 'float'; el.textContent = text; el.style.color = color;
   hud.appendChild(el); floats.push({ el, lane, side, t0: performance.now() + delay, dx: (Math.random() - 0.5) * 40 });
 }
 
 function processFx() {
-  const b = G.battle; const list = b.drainFx(); let d = 0; let sound = {};
+  const b = G.battle; const list = b.drainFx(); let d = 0; const sound = {};
   for (const f of list) {
     const delay = d;
     switch (f.t) {
-      case 'float': addFloat(f.lane, f.side || 'player', f.text, f.color, delay); d += 90; break;
-      case 'strike': setTimeout(() => board.strike(f.lane, f.n), delay); addFloat(f.lane, 'enemy', `−${f.n}`, '#ffe27a', delay + 300); d += 140; sound.strike = 1; break;
-      case 'egain': setTimeout(() => board.egain(f.lane), delay); sound.gain = 1; break;
-      case 'freeze': setTimeout(() => board.freeze(f.lane), delay); sound.freeze = 1; break;
-      case 'buff': setTimeout(() => board.buff(f.bid, f.n), delay); sound.buff = 1; break;
+      case 'float': addFloat(f.lane, f.side ?? 0, f.text, f.color, delay); d += 80; break;
+      case 'reveal': setTimeout(() => { board.revealFx(f.bid); sfx.play(); }, delay); d += 260; break;
+      case 'strike': setTimeout(() => board.strike(f.lane, f.from, f.bid, f.n), delay); addFloat(f.lane, 1 - f.from, `−${f.n}`, f.from === 0 ? '#ffe27a' : '#ff8a8a', delay + 300); d += 160; sound.strike = 1; break;
+      case 'freeze': setTimeout(() => board.freeze(f.lane, f.side), delay); sound.freeze = 1; break;
+      case 'buff': if (f.n) setTimeout(() => board.buff(f.bid, f.n), delay); sound.buff = 1; break;
       case 'destroy': sound.destroy = 1; break;
       case 'gold': sound.coin = 1; break;
-      case 'play': board.playFx(f.bid); sound.play = 1; break;
+      case "stage": sound.click = 1; break;
+      case 'unstage': board.unstage(f.bid); break;
+      case 'revealOrder': addFloat(1, f.first, f.first === 0 ? 'You reveal first' : 'Opponent reveals first', '#e8d29a', delay); d += 120; break;
     }
   }
   for (const k of Object.keys(sound)) sfx[k]?.();
@@ -317,7 +314,6 @@ function bindHand() {
   let drag = null;
   hand.querySelectorAll('.hc').forEach((el) => {
     el.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.holdbtn')) return;
       const hid = +el.dataset.hid;
       drag = { hid, x0: e.clientX, y0: e.clientY, el, moved: false, ghost: null };
       el.setPointerCapture(e.pointerId);
@@ -358,14 +354,19 @@ canvas.addEventListener('pointerup', (e) => {
   if (mode !== 'battle' || !G.battle || G.battle.over) return;
   const hit = pickAt(e.clientX, e.clientY); if (!hit) return;
   const b = G.battle;
-  if (G.sel != null && (hit.type === 'lane' || hit.type === 'card' || hit.type === 'enemy')) { tryPlay(G.sel, hit.lane); return; }
+  if (G.sel != null && hit.lane != null) { tryPlay(G.sel, hit.lane); return; }
   if (G.moveSel != null && hit.lane != null) {
-    const bc = b.allCards().find((c) => c.bid === G.moveSel);
+    const bc = b.findCard(G.moveSel);
     if (bc && bc.lane !== hit.lane) { const r2 = b.playerMove(G.moveSel, hit.lane); if (!r2.ok) toast(r2.why || "Can't move there"); else sfx.play(); }
     G.moveSel = null; board.sync(); processFx(); render(); return;
   }
-  if (hit.type === 'card') { const bc = b.allCards().find((c) => c.bid === hit.bid); if (bc) { G.modal = { type: 'boardCard', bid: bc.bid }; render(); } return; }
-  if (hit.type === 'enemy') { G.modal = { type: 'enemy', lane: hit.lane }; render(); }
+  if (hit.type === 'card') {
+    const bc = b.findCard(hit.bid); if (!bc) return;
+    if (bc.side === 0 && !bc.revealed) { b.unplay(bc.bid); processFx(); board.sync(); sfx.click(); render(); return; }
+    G.modal = { type: 'boardCard', bid: bc.bid }; render(); return;
+  }
+  if (hit.type === 'opponent') { G.modal = { type: 'opponent' }; render(); return; }
+  if (hit.type === 'lane') { G.modal = { type: 'lane', lane: hit.lane }; render(); }
 });
 
 // ---------- reward ----------
@@ -512,8 +513,7 @@ SCREENS.codex = () => {
   if (G.codexTab === 'Cards') body = `<div class="deckgrid small">${CARD_LIST.filter((c) => !c.evo).map((c) => un.has(c.set) || c.set === 'core' ? cardImg(c.id, {}, `data-a="inspectDef" data-id="${c.id}"`) : `<div class="card lockedcard"><span>🔒</span><small>${esc(UNLOCK_MAP[c.set]?.name || 'Locked')}</small></div>`).join('')}</div>`;
   if (G.codexTab === 'Evolutions') body = `<div class="evo-list">${EVO_RECIPES.map((e) => `<div class="evo">${cardImg(e.base)}<span class="plus">+</span>${cardImg(e.catalyst)}<span class="plus">=</span>${G.meta.recipes[e.result] ? cardImg(e.result, {}, `data-a="inspectDef" data-id="${e.result}"`) : '<div class="card lockedcard"><span>?</span><small>Evolve to discover</small></div>'}</div>`).join('')}</div>`;
   if (G.codexTab === 'Relics') body = `<div class="relic-choices">${RELIC_LIST.map((r) => (un.has(r.unlock) || !r.unlock ? relicCard(r.id) : `<div class="relic-card locked"><b>🔒 ${esc(r.name)}</b><small>${esc(UNLOCK_MAP[r.unlock]?.name)}</small></div>`)).join('')}</div>`;
-  if (G.codexTab === 'Enemies') body = `<div class="enemy-list">${Object.values(ENEMY_TYPES).map((t) => `<div class="enemy-entry"><img src="${enemyURL(t.id)}"><div><b>${esc(t.name)}</b> <small>${esc(t.genre)} · ${t.tier}</small><p>${esc(t.blurb)}</p></div></div>`).join('')}
-    ${Object.values(BOSSES).map((bo) => `<div class="enemy-entry boss"><img src="${enemyURL(bo.enemies[0])}"><div><b>${esc(bo.name)}</b> <small>Act ${bo.act} boss</small><p>${esc(bo.text)}</p></div></div>`).join('')}</div>`;
+  if (G.codexTab === 'Enemies') body = `<div class="enemy-list">${Object.values(OPPONENTS).map((o) => `<div class="enemy-entry ${o.tier}"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${o.tier === 'boss' ? 'Boss' : o.tier === 'elite' ? 'Elite' : 'Act ' + o.acts.join('–')}</small><p>${esc(o.boss ? BOSSES[o.boss].text : o.text)}</p></div></div>`).join('')}</div>`;
   if (G.codexTab === 'Locations') body = `<div class="enemy-list">${LOCATION_LIST.map((l) => `<div class="enemy-entry"><img src="${artURL({ f: 'none', bg: l.art.bg, pal: l.art.pal }, 'loc' + l.id)}"><div><b>${esc(l.name)}</b>${l.unlock && !un.has(l.unlock) ? ' 🔒' : ''}<p>${esc(l.text)}</p></div></div>`).join('')}</div>`;
   if (G.codexTab === 'Home') body = `<div class="relic-choices">${Object.values(HOME_UPGRADES).map((h) => `<div class="relic-card"><img src="${glyphURL(h.icon, 96, '#4a2a6a')}"><b>${esc(h.name)}</b><small>${esc(h.text)}</small></div>`).join('')}</div>`;
   return `<div class="screen scroll"><div class="panel wide"><h2>Codex</h2>
@@ -523,7 +523,7 @@ SCREENS.codex = () => {
 
 // ---------- modals ----------
 function sortDeck(d) { return d.slice().sort((a, b) => cardDef(a.id).cost - cardDef(b.id).cost || cardDef(a.id).name.localeCompare(cardDef(b.id).name)); }
-const KEYWORDS = { reveal: ['On Reveal', 'Triggers once when played.'], ongoing: ['Ongoing', 'Always active while on the board.'], move: ['Move', 'Tap it on the board, then another lane. Once per turn.'], strike: ['Strike', 'Knock points off the enemy machine in that lane (some machines react differently).'], freeze: ['Freeze', 'The enemy machine skips its next end-of-turn action.'], discard: ['Lingering', 'Triggers when discarded from your hand (unplayed cards are discarded at end of turn).'], hold: ['Hold', 'Tap 🔒 on a card in hand to keep it for next turn.'], destroy: ['Destroy', 'Destroyed cards go to your discard pile.'], grow: ['Grow', 'Gains power over time.'] };
+const KEYWORDS = { reveal: ['On Reveal', 'Triggers once when played.'], ongoing: ['Ongoing', 'Always active while on the board.'], move: ['Move', 'Tap it on the board, then another lane. Once per turn.'], strike: ['Strike', 'The strongest enemy card in that lane gets −N Power.'], freeze: ['Freeze', "Your opponent can't play cards in that lane next turn."], discard: ['Lingering', 'Triggers when discarded from your hand by an effect.'], hold: ['Patience', 'Gets better the longer it waits in your hand.'], junk: ['Junk', 'A 0-Power token that takes up a slot.'], destroy: ['Destroy', 'Destroyed cards go to your discard pile.'], grow: ['Grow', 'Gains power over time.'] };
 function modalHtml() {
   const m = G.modal; const r = G.run;
   let inner = '';
@@ -536,23 +536,27 @@ function modalHtml() {
     inner = `<div class="inspect"><img class="card big" src="${m.inst ? instURL(m.inst) : cardURL(m.id)}"><div>${kws}${(m.inst?.sockets || []).filter(Boolean).map((g) => `<p>${gemChip(g)} ${esc(GEMS[g].text)}</p>`).join('')}${evoHint(m.id)}</div></div>`;
   }
   if (m.type === 'boardCard') {
-    const b = G.battle; const bc = b.allCards().find((c) => c.bid === m.bid);
+    const b = G.battle; const bc = b.findCard(m.bid);
     if (!bc) { G.modal = null; return ''; }
     const kws = (bc.def.tags || []).filter((t) => KEYWORDS[t]).map((t) => `<p><b>${KEYWORDS[t][0]}</b>: ${KEYWORDS[t][1]}</p>`).join('');
     inner = `<div class="inspect"><img class="card big" src="${cardURL(bc.def, { power: b.power(bc), plus: bc.inst?.plus, sockets: bc.inst?.sockets || [], bonus: bc.inst?.bonus })}"><div>
       <p>Base ${bc.base} · Buffs ${bc.buff >= 0 ? '+' : ''}${bc.buff} · Auras ${bc.aura >= 0 ? '+' : ''}${bc.aura}</p>${kws}
       ${b.canMoveCard(bc) ? `<button class="btn primary" data-a="startMove" data-bid="${bc.bid}">Move this card</button>` : ''}</div></div>`;
   }
-  if (m.type === 'enemy') {
-    const b = G.battle; const lane = b.lanes[m.lane]; const t = ENEMY_TYPES[lane.enemy.id];
-    inner = `<div class="inspect"><img class="portrait" src="${enemyURL(lane.enemy.id)}"><div><h2>${esc(t.name)}</h2><p class="dim">${esc(t.genre)} machine</p><p>${esc(t.blurb)}</p>
-      <p><b>Next:</b> ${esc(lane.enemy.intent(b, lane).text)}</p><p><b>Score:</b> ${lane.enemy.display(b, lane)}</p>${lane.enemy.frozen ? '<p>❄ Frozen</p>' : ''}
-      <p><b>Lane:</b> ${lane.isHome ? 'Home — ' + (lane.home.map((h) => h.name).join(', ') || 'no upgrades') : esc(lane.loc.name + ' — ' + lane.loc.text)}</p></div></div>`;
+  if (m.type === 'opponent') {
+    const b = G.battle; const o = b.opp; const boss = b.boss;
+    inner = `<div class="inspect"><img class="portrait" src="${enemyURL(o.portrait)}"><div><h2>${esc(o.name)}</h2><p class="dim">${esc(o.title)}</p><p>${esc(boss ? boss.text : o.text || '')}</p>
+      <p><b>Hand:</b> ${b.S[1].hand.length} · <b>Deck:</b> ${b.S[1].deck.length}</p>${G.run.enc_bonus ? '' : ''}${b.enc.bonus ? `<p>Their cards have +${b.enc.bonus} Power.</p>` : ''}</div></div>`;
+  }
+  if (m.type === 'lane') {
+    const b = G.battle; const lane = b.lanes[m.lane];
+    inner = `<h2>${lane.isHome ? 'Home' : esc(lane.loc.name)}</h2><p>${lane.isHome ? (lane.home.map((h) => `<b>${esc(h.name)}</b>: ${esc(h.text)}`).join('<br>') || 'Your Home lane. Add upgrades at Builders.') : esc(lane.loc.text)}</p>
+      <p>You <b>${lane.totals[0]}</b> · Opponent <b>${lane.totals[1]}</b></p>${lane.lock[0] === b.turn ? '<p>❄ Frozen: you can\'t play here this turn.</p>' : ''}`;
   }
   if (m.type === 'relic') { inner = relicCard(m.id); }
   if (m.type === 'pick') inner = `<h2>${esc(m.title)}</h2><div class="deckgrid">${sortDeck(r.deck).filter(m.filter || (() => true)).map((c) => instImg(c, `data-a="modalPick" data-uid="${c.uid}"`)).join('')}</div>`;
   if (m.type === 'menu') inner = `<h2>Paused</h2><div class="menu-col"><button class="btn" data-a="closeModal">Resume</button><button class="btn" data-a="howtoModal">How to Play</button><button class="btn" data-a="toggleSound">Sound: ${G.meta.settings.sound ? 'On' : 'Off'}</button><button class="btn" data-a="saveQuit">Save & Quit to Title</button><button class="btn bad" data-a="abandon">Abandon Run</button></div>`;
-  if (m.type === 'help') inner = `<h2>Battle Basics</h2><div class="prose"><p>Drag a card onto a lane (or tap a card, then tap a lane). Win <b>2 of 3</b> lanes after ${G.battle?.maxTurns || 6} turns.</p><p>Each enemy machine shows its <b>intent</b> above its lane. The number under it is its score; yours is the badge in front of your cards (green = winning).</p><p>Tap 🔒 to <b>Hold</b> a card for next turn. Tap a card on the board to inspect it or <b>Move</b> it. Tap a machine to inspect it.</p></div>`;
+  if (m.type === 'help') inner = `<h2>Battle Basics</h2><div class="prose"><p>Drag a card onto a lane (or tap a card, then tap a lane). Win <b>2 of 3</b> lanes after ${G.battle?.maxTurns || 6} turns.</p><p>Energy = turn number. Played cards stay face-down until <b>End Turn</b>, then both sides reveal. Tap a face-down card to take it back.</p><p>The badges show each side's Power per lane (green = you're winning). Tap a revealed card to inspect or <b>Move</b> it; tap the opponent's portrait to see their info.</p></div>`;
   return `<div class="overlay" data-a="closeModalBg"><div class="panel modal ${m.type}">${inner}<button class="btn closex" data-a="closeModal">✕</button></div></div>`;
 }
 
@@ -619,11 +623,10 @@ A.leaveNode = () => { const r = G.run; r.node.done = true; G.mapSel = null; pers
 function startBattle(n) {
   const r = G.run;
   G.battle = new Battle(r, n.enc, (r.seed ^ (r.fights * 7919) ^ n.row * 31) >>> 0);
-  G.battle.start(); G.sel = null; G.moveSel = null; G.lastOutcome = null; G.battleHint = r.fights === 0 && !G.meta.tutorialDone ? 'Drag a card onto a lane. Win 2 of 3 lanes after 6 turns. Watch each machine\'s intent!' : null;
+  G.battle.start(); G.sel = null; G.moveSel = null; G.lastOutcome = null; G.battleHint = r.fights === 0 && !G.meta.tutorialDone ? 'Drag a card onto a lane, then End Turn to reveal. Win 2 of 3 lanes after 6 turns.' : null;
   mode = 'battle'; G.screen = 'battle'; render();
   board.setup(G.battle); processFx(); sfx.turn();
 }
-A.hold = (d) => { G.battle.toggleHold(+d.hid); sfx.click(); render(); };
 A.endTurn = () => {
   const b = G.battle; if (b.over) return;
   G.sel = null; G.moveSel = null; G.battleHint = null;
@@ -639,7 +642,8 @@ A.endTurn = () => {
   render();
 };
 A.startMove = (d) => { G.moveSel = +d.bid; G.modal = null; G.sel = null; toast('Tap a lane to move it there.'); };
-A.laneInfo = (d) => { G.modal = { type: 'enemy', lane: +d.lane }; render(); };
+A.laneInfo = (d) => { G.modal = { type: 'lane', lane: +d.lane }; render(); };
+A.oppInfo = () => { G.modal = { type: 'opponent' }; render(); };
 A.battleHelp = () => { G.modal = { type: 'help' }; render(); };
 A.afterBattle = () => {
   G.battle = null; mode = 'menu';
