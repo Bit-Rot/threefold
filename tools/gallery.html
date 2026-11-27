@@ -1,0 +1,11 @@
+<!doctype html><html><body style="background:#111;margin:0"><div id="g" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px"></div>
+<script type="module">
+import { CARD_LIST } from '../src/data/cards.js';
+import { cardCanvas, enemyCanvas, glyphCanvas } from '../src/art/cardRender.js';
+const g = document.getElementById('g');
+const which = new URLSearchParams(location.search).get('p') || '0';
+const list = CARD_LIST.slice(+which * 24, +which * 24 + 24);
+for (const c of list) { const cv = cardCanvas(c); cv.style.width = '150px'; g.appendChild(cv); }
+if (which === 'e') { for (const id of ['tide','metronome','march','factory','nightfall','hoarder','siege','junkline','reel','commission','leech','baton','brood','engine','engine_ram']) { const cv = enemyCanvas(id); cv.style.width='128px'; g.appendChild(cv);} for (const k of ['coin','bag','flame','crown','heart','skull','battle','elite','boss','shop','forge','purge','mirror','camp','event','treasure','home','up','drum','walker','gear','reel','ram','junk','moon','sun']) { const cv = glyphCanvas(k, 64, '#3a2f48'); g.appendChild(cv);} }
+window.done = true;
+</script></body></html>
