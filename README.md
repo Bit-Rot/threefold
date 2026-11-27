@@ -16,11 +16,11 @@ In the repo settings, set **Pages → Source** to **GitHub Actions** once.
 ## Content
 - 90 cards + 12 evolutions (base + catalyst + Evo Gem), 6 tribes
 - 5 wardens, 44 relics, 11 gems, 21 locations, 15 Home-lane upgrades
-- 11 regular opponents, 5 elites, 8 bosses with distinct rules, and 12 events
-- Meta progression (the Archive) with 31 unlocks and 8 Heat levels
+- 11 regular opponents and 8 bosses with distinct rules
+- Meta progression through the Archive and 8 Heat levels
 - All art is procedurally painted at runtime (`src/art/painter.js`) — no image assets.
 
-Gem nodes and shops socket gems directly into a compatible card. A Forge can bore an empty socket, fuse duplicates, or evolve a card that already has an Evo Gem.
+Cards start with one socket. Gem nodes and shops socket gems directly into a compatible card and offer Evo Gems only when you have a base card and its catalyst. The Evo Gem and catalyst are spent as soon as you confirm the evolution. Fuse nodes combine duplicate cards, and Campfires refill your hearts.
 
 ## Layout
 - `src/engine/` — DOM-free rules (battle, run/map/shop/forge)

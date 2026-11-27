@@ -1,12 +1,11 @@
-// Run-level systems: map generation, encounters, rewards, shops, forge, events, meta payouts.
+// Run-level systems: map generation, encounters, rewards, shops, fusion, meta payouts.
 import { CARD_LIST, CARDS, EVO_RECIPES, RARITY_WEIGHT, cardDef } from '../data/cards.js';
 import { GEM_LIST, GEMS } from '../data/gems.js';
 import { RELIC_LIST, RELICS, RELIC_PRICE } from '../data/relics.js';
 import { LOCATION_LIST } from '../data/locations.js';
-import { HOME_LIST, HOME_UPGRADES } from '../data/home.js';
+import { HOME_LIST } from '../data/home.js';
 import { ACT_POOLS, BOSSES, OPPONENTS, BOSS_ORDER } from '../data/enemies.js';
 import { WARDENS } from '../data/wardens.js';
-import { EVENTS } from '../data/events.js';
 import { UNLOCK_MAP } from '../data/meta.js';
 import { makeRng } from '../core/rng.js';
 
@@ -35,10 +34,9 @@ export function rngFor(run) {
   return wrap;
 }
 
-export function socketsFor(def) { return ['rare', 'legendary', 'evolved'].includes(def.rarity) ? 2 : 1; }
 export function makeInst(run, id, extra = {}) {
   const def = cardDef(id);
-  return { uid: 'c' + run.nextUid++, id, plus: 0, bonus: 0, sockets: new Array(def.token ? 0 : socketsFor(def)).fill(null), ...extra };
+  return { uid: 'c' + run.nextUid++, id, plus: 0, bonus: 0, sockets: def.token ? [] : [null], ...extra };
 }
 
 const RETIRED_CARDS = {
@@ -53,21 +51,17 @@ export function newRun(meta, wardenId, heat = 0, seed) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
   const warden = WARDENS[wardenId];
   const run = {
-    v: 4, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
+    v: 5, seed, rngState: seed || 1, warden: wardenId, heat, act: 1, nextUid: 1,
     deck: [], relics: [], gold: 60, hearts: 3, maxHearts: 3, home: [],
     map: null, pos: null, visited: [], fightsWon: 0, fights: 0, shards: 0, log: [],
     rerolls: 0, banishes: 0, banished: [], secondWind: {}, removalsBought: 0, over: false,
     unlocked: [...unlockedSet(meta)], perks: [...(meta.unlocked || [])].filter((u) => u.startsWith('perk_')),
-    stats: { evolutions: 0, cardsAdded: 0, removed: 0, elites: 0, bosses: 0 },
+    stats: { evolutions: 0, cardsAdded: 0, removed: 0, bosses: 0 },
   };
   if (heat >= 7) { run.hearts--; run.maxHearts--; }
   for (const id of warden.deck) run.deck.push(makeInst(run, id));
   if (heat >= 4) run.deck.push(makeInst(run, 'junk'));
   if (warden.relic) gainRelic(run, warden.relic);
-  if (wardenId === 'forgemaster') {
-    const rng = rngFor(run);
-    for (const c of rng.sample(run.deck.filter((c) => c.id !== 'junk'), 2)) c.sockets.push(null);
-  }
   if (run.perks.includes('perk_reroll')) run.rerolls += 1;
   if (run.perks.includes('perk_reroll2')) run.rerolls += 2;
   if (run.perks.includes('perk_banish')) run.banishes = 2;
@@ -76,7 +70,7 @@ export function newRun(meta, wardenId, heat = 0, seed) {
 }
 
 export function migrateRun(run) {
-  if (![1, 2, 3].includes(run.v)) return run;
+  if (![1, 2, 3, 4].includes(run.v)) return run;
   if (run.v === 1) {
     run.gold += (run.gems || []).reduce((sum, id) => sum + (GEMS[id]?.price || 0), 0);
     delete run.gems;
@@ -84,35 +78,61 @@ export function migrateRun(run) {
   run.visited ||= [];
   // Preserve encounters already entered and the choices made on their maps.
   if (run.v < 3 && !run.pos) run.map = genActMap(run, run.act);
-  for (const card of run.deck) card.id = RETIRED_CARDS[card.id] ?? card.id;
+  for (const card of run.deck) {
+    card.id = RETIRED_CARDS[card.id] ?? card.id;
+    card.sockets = (card.sockets ?? (cardDef(card.id).token ? [] : [null])).map((gem) => {
+      if (gem !== 'evo') return gem;
+      run.gold += GEMS.evo.price;
+      return null;
+    });
+  }
   for (const item of run.node?.shop?.items || []) {
     if (item.kind === 'card') item.id = RETIRED_CARDS[item.id] ?? item.id;
   }
-  if (run.pendingReward) {
+  migrateRemovedNodes(run);
+  if (run.pendingReward && (run.v < 4 || run.pendingReward.kind === 'elite')) {
     const reward = run.pendingReward;
     reward.kind = nodeById(run, run.pos)?.enc?.kind ?? 'battle';
     reward.cards = rollRewardCards(run, reward.kind, reward.cards.length);
   }
-  run.v = 4;
+  run.v = 5;
   return run;
 }
 
 // ---------- map ----------
-const SERVICES = ['forge', 'purge', 'mirror', 'camp', 'event', 'treasure', 'home'];
+const SERVICES = ['forge', 'purge', 'mirror', 'camp', 'treasure', 'home'];
 export const NODE_INFO = {
   battle: { name: 'Battle', desc: 'A fight. Win 2 of 3 lanes.' },
-  elite: { name: 'Elite', desc: 'A harder fight. Win to earn a relic.' },
   boss: { name: 'Boss', desc: 'Both paths lead to this fight.' },
-  gem: { name: 'Gem', desc: 'Choose a gem and socket it into a card here.' },
+  gem: { name: 'Gem', desc: 'Socket a gem or spend an Evo Gem to evolve a card here.' },
   shop: { name: 'Shop', desc: 'Buy cards, gems, relics and card removal.' },
-  forge: { name: 'Forge', desc: 'Bore sockets, evolve cards, or fuse duplicates.' },
+  forge: { name: 'Fuse', desc: 'Combine two copies of a card into one upgraded card.' },
   purge: { name: 'Shrine of Ash', desc: 'Remove a card from your deck.' },
   mirror: { name: 'Mirror Pool', desc: 'Duplicate a card in your deck.' },
-  camp: { name: 'Campfire', desc: 'Upgrade a card or heal a heart.' },
-  event: { name: 'Mystery', desc: 'Something strange on the road.' },
+  camp: { name: 'Campfire', desc: 'Refill all your hearts.' },
   treasure: { name: 'Treasure', desc: 'A relic and some gold.' },
   home: { name: 'Builder', desc: 'Add an upgrade to your Home lane.' },
 };
+
+function migrateRemovedNodes(run) {
+  const nodes = run.map.rows.flat();
+  const used = new Set(nodes.map((node) => node.type));
+  for (const node of nodes) {
+    if (node.type === 'event') {
+      node.type = SERVICES.find((type) => !used.has(type)) ?? 'treasure';
+      used.add(node.type);
+      if (run.node?.id === node.id) {
+        if (run.node.result != null) run.node.done = true;
+        delete run.node.event;
+        delete run.node.result;
+      }
+    } else if (node.type === 'elite') {
+      node.type = 'battle';
+      node.enc = makeEncounter(run, run.act, node);
+    }
+    if (run.node?.id === node.id) run.node.type = node.type;
+  }
+}
 
 export function genActMap(run, act) {
   const rng = rngFor(run);
@@ -126,7 +146,7 @@ export function genActMap(run, act) {
   branches.forEach((node, col) => node.next.push(stops[col].id));
   stops.forEach((node) => node.next.push(boss.id));
   // pre-roll encounters so the map can scout them
-  for (const row of map.rows) for (const node of row) if (['battle', 'elite', 'boss'].includes(node.type)) node.enc = makeEncounter(run, act, node);
+  for (const row of map.rows) for (const node of row) if (['battle', 'boss'].includes(node.type)) node.enc = makeEncounter(run, act, node);
   return map;
 }
 
@@ -148,10 +168,9 @@ export function makeEncounter(run, act, node) {
   const bonus = Math.max(0, region - 2) + (run.heat >= 8 ? 1 : 0);
   const enemyStartBonus = run.heat >= 1 ? 1 : 0;
   if (node.type === 'boss') return { kind: 'boss', opponent: BOSS_ORDER[act - 1], locs: locIds, bonus: bonus + (run.heat >= 5 ? 1 : 0), plus: region >= 2, enemyStartBonus };
-  if (node.type === 'elite') return { kind: 'elite', opponent: rng.pick(pools.elite), locs: locIds, bonus: bonus + (run.heat >= 3 ? 1 : 0), plus: region >= 2, enemyStartBonus };
   const used = run._usedOpp || (run._usedOpp = []);
-  const fresh = pools.basic.filter((id) => !used.includes(id));
-  const pick = rng.pick(fresh.length ? fresh : pools.basic); used.push(pick); if (used.length > 6) used.shift();
+  const fresh = pools.filter((id) => !used.includes(id));
+  const pick = rng.pick(fresh.length ? fresh : pools); used.push(pick); if (used.length > 6) used.shift();
   return { kind: 'battle', opponent: pick, locs: locIds, bonus, plus: region >= 3, enemyStartBonus };
 }
 
@@ -199,7 +218,7 @@ export function rewardCount(run) {
 
 const rewardBand = (cost) => cost <= 2 ? 0 : cost <= 4 ? 1 : 2;
 export function rollRewardCards(run, kind, count = rewardCount(run), kept = []) {
-  const minRarity = kind === 'boss' ? 'rare' : kind === 'elite' ? 'uncommon' : 'common';
+  const minRarity = kind === 'boss' ? 'rare' : 'common';
   const pool = eligibleCards(run, minRarity).filter((card) => !kept.includes(card.id));
   const rng = rngFor(run);
   const weight = cardWeight(run);
@@ -236,13 +255,12 @@ export function banishRewardCard(run, index) {
 // ---------- battle results ----------
 export function applyBattle(run, meta, node, result) {
   const enc = node.enc;
-  const out = { won: result.won, gold: result.gold, shards: 0, heartLost: false, lanesWon: result.lanesWon, notes: result.notes || [], relic: null };
+  const out = { won: result.won, gold: result.gold, shards: 0, heartLost: false, lanesWon: result.lanesWon, notes: result.notes || [] };
   run.fights++;
   run.gold += result.gold;
   out.shards = result.lanesWon + (result.won ? 2 : 0);
   if (result.won) {
     run.fightsWon++;
-    if (enc.kind === 'elite') { out.shards += 3; run.stats.elites++; out.relic = gainRandomRelicId(run); }
     if (enc.kind === 'boss') {
       out.shards += 8; run.stats.bosses++;
       for (const id of run.relics) RELICS[id]?.afterBoss?.(run);
@@ -282,6 +300,12 @@ export function enterNode(run, id) {
   run.pos = id;
   return true;
 }
+export function restAtCamp(run) {
+  const node = run.node;
+  if (node?.type !== 'camp' || node.done || node.heartsRestored != null) return;
+  node.heartsRestored = run.maxHearts - run.hearts;
+  run.hearts = run.maxHearts;
+}
 export function finishAct(run) {
   if (run.act >= ACTS) { run.over = 'victory'; return; }
   run.act++;
@@ -303,14 +327,15 @@ export function rollShop(run) {
   let nCards = 5; for (const id of run.relics) nCards += RELICS[id]?.shopBonus || 0;
   const m = priceMult(run);
   const cards = rollCards(run, nCards).map((id) => ({ kind: 'card', id, price: Math.round(CARD_PRICE[CARDS[id].rarity] * m * (0.9 + rng.next() * 0.2)), sold: false }));
-  const gems = rng.sample(gemPool(run), 2).map((g) => ({ kind: 'gem', id: g.id, price: Math.round(g.price * m), sold: false }));
+  const gems = rng.sample(gemPool(run).filter((g) => !g.evo || canOfferGem(run, g.id)), 2)
+    .map((g) => ({ kind: 'gem', id: g.id, price: Math.round(g.price * m), sold: false }));
   const relics = rng.sample(relicPool(run), 2).map((r) => ({ kind: 'relic', id: r.id, price: Math.round(RELIC_PRICE[r.rarity] * m), sold: false }));
   return { items: [...cards, ...gems, ...relics], removePrice: Math.round((60 + 25 * run.removalsBought) * m), removeUsed: false };
 }
-export function buy(run, shop, idx, uid) {
+export function buy(run, shop, idx, uid, evo) {
   const it = shop.items[idx];
   if (!it || it.sold || run.gold < it.price) return false;
-  if (it.kind === 'gem' && !socketGem(run, it.id, uid)) return false;
+  if (it.kind === 'gem' && !applyGem(run, it.id, uid, evo)) return false;
   run.gold -= it.price; it.sold = true;
   if (it.kind === 'card') takeCard(run, it.id);
   if (it.kind === 'relic') gainRelic(run, it.id);
@@ -320,48 +345,49 @@ export function buy(run, shop, idx, uid) {
 // ---------- deck manipulation ----------
 export function removeCard(run, uid) { const i = run.deck.findIndex((c) => c.uid === uid); if (i >= 0) { run.deck.splice(i, 1); run.stats.removed++; return true; } return false; }
 export function cloneCard(run, uid) { const c = run.deck.find((c) => c.uid === uid); if (!c) return null; const n = makeInst(run, c.id, { plus: c.plus }); run.deck.push(n); return n; }
-export function upgradeCard(run, uid) { const c = run.deck.find((c) => c.uid === uid); if (!c || c.plus) return false; c.plus = 1; return true; }
 export function canSocket(card, gemId) {
-  return Boolean(card && GEMS[gemId] && !cardDef(card.id).token && card.sockets.includes(null) &&
-    (gemId !== 'evo' || (!card.sockets.includes('evo') && EVO_RECIPES.some((r) => r.base === card.id))));
+  return Boolean(card && GEMS[gemId] && !GEMS[gemId].evo && !cardDef(card.id).token && card.sockets.includes(null));
 }
-function socketGem(run, gemId, uid) {
+function applyGem(run, gemId, uid, { meta, catalystUid } = {}) {
+  if (GEMS[gemId]?.evo) return evolve(run, meta, uid, catalystUid);
   const card = run.deck.find((c) => c.uid === uid);
   if (!canSocket(card, gemId)) return false;
   card.sockets[card.sockets.indexOf(null)] = gemId;
   return true;
 }
+export function canOfferGem(run, gemId) {
+  return GEMS[gemId]?.evo ? evoOptions(run).length > 0 : run.deck.some((card) => canSocket(card, gemId));
+}
 export function rollGemChoices(run) {
-  const eligible = gemPool(run).filter((g) => run.deck.some((c) => canSocket(c, g.id)));
+  const eligible = gemPool(run).filter((g) => canOfferGem(run, g.id));
   return rngFor(run).sample(eligible, 3).map((g) => g.id);
 }
-export function claimGem(run, gemId, uid) {
+export function claimGem(run, gemId, uid, evo) {
   const node = run.node;
-  if (node?.type !== 'gem' || node.done || !node.gemChoices?.includes(gemId) || !socketGem(run, gemId, uid)) return false;
+  if (node?.type !== 'gem' || node.done || !node.gemChoices?.includes(gemId) || !applyGem(run, gemId, uid, evo)) return false;
   node.done = true;
   return true;
 }
-export function boreSocket(run, uid) { const c = run.deck.find((c) => c.uid === uid); if (!c || cardDef(c.id).token || c.sockets.length >= 3) return false; c.sockets.push(null); return true; }
 export function evoOptions(run) {
   const out = [];
-  for (const c of run.deck) {
-    const r = EVO_RECIPES.find((r) => r.base === c.id); if (!r) continue;
-    const cat = run.deck.find((d) => d.id === r.catalyst && d.uid !== c.uid);
-    out.push({ uid: c.uid, recipe: r, hasGem: c.sockets.includes('evo'), catalystUid: cat?.uid || null, ready: c.sockets.includes('evo') && !!cat });
+  for (const base of run.deck) {
+    const recipe = EVO_RECIPES.find((r) => r.base === base.id);
+    if (!recipe) continue;
+    for (const catalyst of run.deck) {
+      if (catalyst.id === recipe.catalyst && catalyst.uid !== base.uid) out.push({ base, catalyst, recipe });
+    }
   }
   return out;
 }
-export function evolve(run, meta, uid) {
-  const o = evoOptions(run).find((o) => o.uid === uid && o.ready); if (!o) return null;
-  const c = run.deck.find((c) => c.uid === uid);
-  removeCard(run, o.catalystUid); run.stats.removed--;
-  c.id = o.recipe.result;
-  const sock = c.sockets.map((g) => (g === 'evo' ? null : g));
-  while (sock.length < 2) sock.push(null);
-  c.sockets = sock;
+function evolve(run, meta, uid, catalystUid) {
+  const option = evoOptions(run).find(({ base, catalyst }) => base.uid === uid && catalyst.uid === catalystUid);
+  if (!option) return false;
+  const { base, catalyst, recipe } = option;
+  removeCard(run, catalyst.uid); run.stats.removed--;
+  base.id = recipe.result;
   run.stats.evolutions++;
-  if (meta) { meta.recipes[o.recipe.result] = true; meta.stats.evolutions++; }
-  return c;
+  if (meta) { meta.recipes[base.id] = true; meta.stats.evolutions++; }
+  return true;
 }
 export function fuseOptions(run) {
   const groups = {};
@@ -371,14 +397,14 @@ export function fuseOptions(run) {
     for (const [i, first] of group.entries()) {
       const second = group.slice(i + 1).find((card) => canFuse(first, card));
       if (!second) continue;
-      options.push({ id: first.id, a: first.uid, b: second.uid });
+      options.push({ id: first.id, a: first.uid, b: second.uid, sockets: combineSockets(first, second), bonus: (first.bonus || 0) + (second.bonus || 0) });
       break;
     }
   }
   return options;
 }
 function combineSockets(a, b) {
-  const count = Math.min(3, Math.max(a.sockets.length, b.sockets.length) + 1);
+  const count = Math.max(a.sockets.length, b.sockets.length);
   const gems = [...a.sockets, ...b.sockets].filter(Boolean);
   return gems.length > count ? null : [...gems, ...Array(count - gems.length).fill(null)];
 }
@@ -401,39 +427,6 @@ export function homeChoices(run, n = 3) {
   const cap = 4 + run.home.filter((h) => h === 'foundation').length;
   const pool = HOME_LIST.filter((h) => (h.stack ? true : !run.home.includes(h.id)) && !(h.id === 'foundation' && cap >= 6));
   return rng.sample(pool, n).map((h) => h.id);
-}
-
-// ---------- events ----------
-export function rollEvent(run) { return rngFor(run).pick(EVENTS).id; }
-export function eventApi(run) {
-  const rng = rngFor(run);
-  const nonJunk = () => run.deck.filter((c) => !cardDef(c.id).token);
-  const api = {
-    run, rng,
-    gold(n) { run.gold = Math.max(0, run.gold + n); },
-    hearts(n) { run.hearts = Math.max(1, Math.min(run.maxHearts, run.hearts + n)); },
-    gainRandomRelic() { const id = gainRandomRelicId(run); return id ? `Gained ${RELICS[id].name}!` : 'Nothing left to find (+50 gold).'; },
-    gainRandomCard(min) { const id = rollCards(run, 1, min)[0]; takeCard(run, id); return `${CARDS[id].name} joins your deck.`; },
-    addSocketRandom() { const c = rng.pick(nonJunk().filter((c) => c.sockets.length < 3)); if (!c) return 'Nothing to bore.'; c.sockets.push(null); return `${cardDef(c.id).name} gained a socket.`; },
-    duplicateRandom() { const c = rng.pick(nonJunk()); const n = cloneCard(run, c.uid); return `${cardDef(n.id).name} was duplicated.`; },
-    transformRandom(up) {
-      const c = rng.pick(nonJunk()); const order = ['common', 'uncommon', 'rare', 'legendary'];
-      const r = cardDef(c.id).rarity; const target = up ? order[Math.min(3, order.indexOf(r) + 1)] : r;
-      const id = rollCards(run, 1, target)[0]; const old = cardDef(c.id).name; c.id = id; c.plus = 0;
-      return `${old} became ${CARDS[id].name}.`;
-    },
-    upgradeRandom(n) { const pool = rng.sample(nonJunk().filter((c) => !c.plus), n); pool.forEach((c) => (c.plus = 1)); return pool.length ? `Upgraded ${pool.map((c) => cardDef(c.id).name).join(', ')}.` : 'Nothing to upgrade.'; },
-    removeWhere(fn) { const c = rng.pick(run.deck.filter((c) => fn(cardDef(c.id)))); if (!c) return 'Nothing to remove.'; removeCard(run, c.uid); return `Removed ${cardDef(c.id).name}.`; },
-    removeRandom() { const c = rng.pick(run.deck); if (!c) return ''; removeCard(run, c.uid); return `${cardDef(c.id).name} burned away.`; },
-    removeWeakest() { const c = run.deck.slice().sort((a, b) => cardDef(a.id).power - cardDef(b.id).power)[0]; if (!c) return ''; removeCard(run, c.uid); return `Removed ${cardDef(c.id).name}.`; },
-    gainRandomHome() { const id = homeChoices(run, 1)[0]; if (!id) return 'Your Home is complete.'; run.home.push(id); return `Home upgraded: ${HOME_UPGRADES[id].name}.`; },
-    evoHints() {
-      const opts = evoOptions(run);
-      if (!opts.length) return 'None of your cards can evolve yet. Recipes: ' + EVO_RECIPES.slice(0, 3).map((r) => `${CARDS[r.base].name} + ${CARDS[r.catalyst].name}`).join('; ') + '…';
-      return 'Your deck can evolve: ' + opts.map((o) => `${CARDS[o.recipe.base].name} + ${CARDS[o.recipe.catalyst].name} → ${CARDS[o.recipe.result].name}`).join('; ');
-    },
-  };
-  return api;
 }
 
 // ---------- end of run ----------

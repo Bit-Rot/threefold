@@ -17,20 +17,22 @@ async def main():
         await pg.evaluate("""() => { const G = window.__G; G.meta.shards = 999; }""")
         await pg.click('[data-a=archive]'); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f'shots/{TAG}_archive.png')
-        await pg.evaluate("""() => { const G = window.__G; G.meta.unlocked = ['warden_tide','warden_pyre','warden_hex','warden_forge','cache_patience','cache_tribes','cache_gold','cache_crowns','gem_echo','gem_bulwark','gem_drift','perk_scout','perk_reroll','perk_skip','perk_forgecraft','perk_banish','relics_rare','relics_tribes','locs_mystic']; G.meta.maxHeat = 3; }""")
+        await pg.evaluate("""() => { const G = window.__G; G.meta.unlocked = ['warden_tide','warden_pyre','warden_hex','warden_forge','cache_patience','cache_tribes','cache_gold','cache_crowns','gem_echo','gem_bulwark','gem_drift','perk_scout','perk_reroll','perk_skip','perk_banish','relics_rare','relics_tribes','locs_mystic']; G.meta.maxHeat = 3; }""")
         await pg.click('[data-a=title]'); await pg.click('[data-a=newRun]'); await pg.wait_for_timeout(300)
         await pg.click('[data-a=pickWarden][data-id=tidecaller]'); await pg.click('[data-a=heat][data-d="1"]'); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f'shots/{TAG}_wardens.png')
         await pg.click('[data-a=startRun]'); await pg.wait_for_timeout(400)
-        await pg.evaluate("""() => { const G = window.__G; G.run.gold = 500; G.run.deck.push(window.__R.makeInst(G.run,'slinger',{sockets:['evo']}), window.__R.makeInst(G.run,'ballista')); }""")
-        for t in ['shop', 'gem', 'forge', 'event', 'home', 'camp', 'treasure', 'purge', 'mirror']:
+        await pg.evaluate("""() => { const G = window.__G; G.run.gold = 500; G.run.deck.push(window.__R.makeInst(G.run,'slinger'), window.__R.makeInst(G.run,'ballista')); }""")
+        for t in ['shop', 'gem', 'forge', 'home', 'camp', 'treasure', 'purge', 'mirror']:
             await pg.evaluate("""(t) => { const r = window.__G.run; const n = r.map.rows[1][0]; n.type = t; r.pos = r.map.rows[0][0].id; r.node = null; window.__openNode(n.id); }""", t)
             await pg.wait_for_timeout(400)
             await pg.screenshot(path=f'shots/{TAG}_{t}.png')
-            if t == 'forge':
-                await pg.screenshot(path=f'shots/{TAG}_forge_evo.png')
-                btn = await pg.query_selector('[data-a=evolve]')
-                if btn: await btn.click(); await pg.wait_for_timeout(300)
+            if t == 'gem':
+                btn = await pg.query_selector('[data-a=chooseGem][data-id=evo]')
+                if btn:
+                    await btn.click()
+                    await pg.screenshot(path=f'shots/{TAG}_gem_evo.png')
+                    await pg.click('[data-a=closeModal]')
         await pg.evaluate("""() => { window.__G.modal = { type: 'deck' }; }""")
         await pg.click('[data-a=deck]'); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f'shots/{TAG}_deck.png')

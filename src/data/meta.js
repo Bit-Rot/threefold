@@ -36,14 +36,12 @@ export const UNLOCKS = [
   { id: 'perk_skip', kind: 'Perks', name: 'Skip', desc: 'You may skip a forced card pick (+10 gold instead).', cost: 35 },
   { id: 'perk_banish', kind: 'Perks', name: 'Banish', desc: 'Twice per run, banish a card from reward pools for the rest of the run.', cost: 30 },
   { id: 'perk_scout', kind: 'Perks', name: 'Scouting', desc: 'Map nodes show the enemy lineup and locations of upcoming fights.', cost: 15 },
-  { id: 'perk_forgecraft', kind: 'Perks', name: 'Forgecraft', desc: 'Forges also offer a free socket boring once per visit.', cost: 40 },
 ];
 export const UNLOCK_MAP = Object.fromEntries(UNLOCKS.map((u) => [u.id, u]));
 
 export const HEAT = [
   { lvl: 1, text: 'Opponents start with 1 extra card in hand.' },
   { lvl: 2, text: 'Shops cost 15% more.' },
-  { lvl: 3, text: "Elites' cards have +1 Power." },
   { lvl: 4, text: 'Start with a Junk in your deck.' },
   { lvl: 5, text: "Bosses' cards have +1 Power." },
   { lvl: 6, text: 'Card rewards offer one fewer choice.' },

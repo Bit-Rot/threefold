@@ -75,11 +75,11 @@ function drawText(ctx, text, x, y, w, h) {
 export function cardCanvas(defOrId, opts = {}) {
   const def = typeof defOrId === 'string' ? cardDef(defOrId) : defOrId;
   const plus = opts.plus ? 1 : 0;
-  const basePow = def.power + (plus ? (def.up?.power ?? 2) : 0) + (opts.bonus || 0) + (opts.sockets || []).reduce((a, g) => a + (GEMS[g]?.power || 0), 0);
+  const sockets = opts.sockets?.length ? opts.sockets : def.token ? [] : [null];
+  const basePow = def.power + (plus ? (def.up?.power ?? 2) : 0) + (opts.bonus || 0) + sockets.reduce((a, g) => a + (GEMS[g]?.power || 0), 0);
   const power = opts.power ?? basePow;
-  const baseCost = def.cost + (plus ? (def.up?.cost ?? 0) : 0) + (opts.sockets || []).reduce((a, g) => a + (GEMS[g]?.cost || 0), 0);
+  const baseCost = def.cost + (plus ? (def.up?.cost ?? 0) : 0) + sockets.reduce((a, g) => a + (GEMS[g]?.cost || 0), 0);
   const cost = opts.cost ?? Math.max(0, baseCost);
-  const sockets = opts.sockets || [];
   const key = `${def.id}|${plus}|${power}|${cost}|${sockets.join(',')}|${opts.bonus || 0}|${basePow}`;
   if (cache.has(key)) return cache.get(key);
   const c = mk(CW, CH); const ctx = c.getContext('2d');
@@ -107,16 +107,25 @@ export function cardCanvas(defOrId, opts = {}) {
   ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.stroke();
   const text = def.text || (def.token ? '' : 'A steadfast ally.');
   if (text) drawText(ctx, text, 26, 284, CW - 52, 96);
-  // footer: tribe + sockets
+  // Footer: tribe and rarity.
   ctx.font = '700 14px "Trebuchet MS", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = rgba(rc, 1);
   ctx.fillText((def.tribe || '').toUpperCase(), 24, 404);
-  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillText(def.rarity === 'evolved' ? 'EVOLVED' : def.rarity?.toUpperCase?.() || '', CW - 24 - sockets.length * 22, 404);
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillText(def.rarity?.toUpperCase() || '', CW - 24, 404);
+  // Keep sockets large enough to read in the hand and on the 3D board.
   sockets.forEach((g, i) => {
-    const x = CW - 30 - i * 22, y = 399;
-    ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2);
-    if (g) { const gg = ctx.createRadialGradient(x - 2, y - 3, 1, x, y, 9); gg.addColorStop(0, '#fff'); gg.addColorStop(0.35, GEMS[g]?.color || '#fff'); gg.addColorStop(1, shade(GEMS[g]?.color || '#888', -0.5)); ctx.fillStyle = gg; }
-    else ctx.fillStyle = '#0b0910';
-    ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#c9a85a'; ctx.stroke();
+    const x = CW / 2 + (i - (sockets.length - 1) / 2) * 42;
+    const y = 37;
+    ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2);
+    ctx.fillStyle = '#17131f'; ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = '#120e19'; ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#e8d29a'; ctx.stroke();
+    if (!g) return;
+    const color = GEMS[g]?.color || '#fff';
+    const gem = ctx.createLinearGradient(x - 6, y - 12, x + 7, y + 14);
+    gem.addColorStop(0, '#fff'); gem.addColorStop(0.32, color); gem.addColorStop(1, shade(color, -0.45));
+    ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x + 12, y);
+    ctx.lineTo(x, y + 14); ctx.lineTo(x - 12, y); ctx.closePath();
+    ctx.fillStyle = gem; ctx.fill();
   });
   // cost gem
   ctx.beginPath(); ctx.arc(40, 40, 28, 0, Math.PI * 2);

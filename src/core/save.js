@@ -16,7 +16,19 @@ export function defaultMeta() {
   };
 }
 export function loadMeta() {
-  try { const m = JSON.parse(get(META_KEY)); if (m) return { ...defaultMeta(), ...m, stats: { ...defaultMeta().stats, ...m.stats }, settings: { ...defaultMeta().settings, ...m.settings } }; } catch {}
+  try {
+    const m = JSON.parse(get(META_KEY));
+    if (m) {
+      const defaults = defaultMeta();
+      const meta = { ...defaults, ...m, stats: { ...defaults.stats, ...m.stats }, settings: { ...defaults.settings, ...m.settings } };
+      if (meta.unlocked.includes('perk_forgecraft')) {
+        meta.unlocked = meta.unlocked.filter((id) => id !== 'perk_forgecraft');
+        meta.shards += 40;
+        saveMeta(meta);
+      }
+      return meta;
+    }
+  } catch {}
   return defaultMeta();
 }
 export function saveMeta(m) { set(META_KEY, JSON.stringify(m)); }

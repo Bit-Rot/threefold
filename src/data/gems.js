@@ -28,6 +28,6 @@ export const GEMS = {
     id: 'frost', name: 'Frost Gem', color: '#d8f6ff', text: 'On Reveal: Freeze the enemy here.', price: 65, unlock: 'gem_frost',
     onReveal(b, bc) { b.freeze(bc.lane); },
   },
-  evo: { id: 'evo', name: 'Evo Gem', color: '#ff5fd2', text: 'Fits an Evo base card. Bring the card and its catalyst to a Forge to evolve it.', price: 90, evo: true },
+  evo: { id: 'evo', name: 'Evo Gem', color: '#ff5fd2', text: 'Evolve a card immediately by consuming its catalyst card.', price: 90, evo: true },
 };
 export const GEM_LIST = Object.values(GEMS);

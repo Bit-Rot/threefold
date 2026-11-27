@@ -21,15 +21,18 @@ JS = """async (warden) => {
       A.endTurn(); continue;
     }
     if (s === 'reward') { const pr = G.run.pendingReward; if (pr.bossRelics) A.bossRelic({id: pr.bossRelics[0]}); else A.takeCard({i: 0}); continue; }
-    if (s === 'event') { if (G.run.node.result == null) A.eventChoice({i: G.run.node && 0}); else A.leaveNode(); continue; }
     if (s === 'home') { A.pickHome({id: G.run.node.choices[0]}); continue; }
-    if (s === 'camp') { A.campUpgradeScreen(); continue; }
-    if (s === 'campUpgrade') { const c = G.run.deck.find(c => !c.plus); if (c) A.upgradeCard({uid: c.uid}); else A.leaveNode(); continue; }
+    if (s === 'camp') { A.leaveNode(); continue; }
     if (s === 'purge') { A.purgeCard({uid: G.run.deck[0].uid}); continue; }
     if (s === 'mirror') { A.mirrorCard({uid: G.run.deck[G.run.deck.length-1].uid}); continue; }
     if (s === 'shop') { A.buy({i: 0}); A.leaveNode(); continue; }
     if (s === 'gem') {
       const id = G.run.node.gemChoices[0];
+      if (id === 'evo') {
+        const { base, catalyst } = R.evoOptions(G.run)[0];
+        A.chooseGem({id}); A.confirmEvo({uid: base.uid, catalyst: catalyst.uid});
+        continue;
+      }
       const card = G.run.deck.find((c) => R.canSocket(c, id));
       if (card) { A.chooseGem({id}); A.modalPick({uid: card.uid}); } else A.leaveNode();
       continue;

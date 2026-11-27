@@ -51,6 +51,11 @@ function playRun(wardenId, heat, seed, meta) {
       if (node.type === 'shop') {
         const shop = R.rollShop(run);
         shop.items.forEach((item, i) => {
+          if (item.kind === 'gem' && item.id === 'evo') {
+            const option = R.evoOptions(run)[0];
+            if (option) R.buy(run, shop, i, option.base.uid, { meta, catalystUid: option.catalyst.uid });
+            return;
+          }
           const target = item.kind === 'gem' ? run.deck.find((card) => R.canSocket(card, item.id)) : null;
           R.buy(run, shop, i, target?.uid);
         });
@@ -58,19 +63,22 @@ function playRun(wardenId, heat, seed, meta) {
       if (node.type === 'gem') {
         run.node.gemChoices = R.rollGemChoices(run);
         const id = run.node.gemChoices[0];
-        const target = run.deck.find((card) => R.canSocket(card, id));
-        if (target && !R.claimGem(run, id, target.uid)) throw new Error('Gem claim failed');
+        if (id === 'evo') {
+          const { base, catalyst } = R.evoOptions(run)[0];
+          if (!R.claimGem(run, id, base.uid, { meta, catalystUid: catalyst.uid })) throw new Error('Evolution claim failed');
+        } else if (id) {
+          const target = run.deck.find((card) => R.canSocket(card, id));
+          if (!R.claimGem(run, id, target?.uid)) throw new Error('Gem claim failed');
+        }
       }
       if (node.type === 'forge') {
-        const ev = R.evoOptions(run).find((o) => o.ready); if (ev) R.evolve(run, meta, ev.uid);
         const f = R.fuseOptions(run)[0]; if (f) R.fuse(run, f.a, f.b);
       }
       if (node.type === 'purge') R.removeCard(run, run.deck[0].uid);
       if (node.type === 'mirror') R.cloneCard(run, run.deck[run.deck.length - 1].uid);
-      if (node.type === 'camp') R.upgradeCard(run, run.deck.find((c) => !c.plus)?.uid);
+      if (node.type === 'camp') R.restAtCamp(run);
       if (node.type === 'treasure') R.gainRandomRelicId(run);
       if (node.type === 'home') { const [id] = R.homeChoices(run); if (id) run.home.push(id); }
-      if (node.type === 'event') R.eventApi(run).upgradeRandom(1);
       run.node.done = true;
     }
   }

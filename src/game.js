@@ -9,7 +9,6 @@ import { LOCATIONS, LOCATION_LIST } from './data/locations.js';
 import { HOME_UPGRADES } from './data/home.js';
 import { OPPONENTS, BOSSES } from './data/enemies.js';
 import { WARDENS, WARDEN_LIST } from './data/wardens.js';
-import { EVENTS } from './data/events.js';
 import { UNLOCKS, UNLOCK_MAP, HEAT } from './data/meta.js';
 import { loadMeta, saveMeta, loadRun, saveRun, clearRun } from './core/save.js';
 import { cardURL, instURL, glyphURL, enemyURL, artURL } from './art/cardRender.js';
@@ -114,9 +113,9 @@ SCREENS.howto = () => `<div class="screen scroll"><div class="panel prose">
   <p><b>Fights.</b> You and an opponent each play cards with <b>Power</b> into your own side of three lanes. After 6 turns, whoever has more Power in a lane wins it. <b>Win 2 of 3 lanes to win the fight</b> (if lanes are tied, total Power decides).</p>
   <p><b>Turns.</b> Your Energy each turn equals the turn number. Both sides draw up to ${DRAW_PER_TURN} fresh cards each turn, with room for ${MAX_HAND} including bonuses. Unplayed cards go back into circulation. Face-down plays reveal at the end of the turn, starting with whoever leads in more lanes. Tap a face-down card to take it back. The middle lane is your <b>Home</b>.</p>
   <p><b>Keywords.</b> <b>On Reveal</b>: triggers when the card reveals. <b>Ongoing</b>: always active while on the board. <b>End of turn</b>: triggers each end of turn. <b>Strike N</b>: the strongest enemy card in that lane gets −N Power. <b>Freeze</b>: your opponent can't play cards in that lane next turn. <b>Move</b>: tap the card on the board, then a lane (once per turn). <b>Lingering</b>: triggers when an effect discards the card. <b>Junk</b>: 0-Power clutter that fills slots.</p>
-  <p><b>The run.</b> Each of the eight stages starts with a battle. Then choose one of two paths with two nodes apiece. Both paths lead to the same boss. Add a card to your deck after each fight. At a Gem node or Shop, choose a compatible card to socket the gem immediately. Forges bore empty sockets, evolve cards, and fuse duplicates. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
+  <p><b>The run.</b> Each of the eight stages starts with a battle. Then choose one of two paths with two nodes apiece. Both paths lead to the same boss. Add a card to your deck after each fight. Cards start with one socket. At a Gem node or Shop, choose a compatible card to socket a gem immediately. Fuse nodes combine duplicate cards. Campfires refill your hearts. Lose a fight and you lose a heart. Lose all hearts and the run ends.</p>
   <p><b>Gold</b> = the total Power in the lanes you win. <b>Shards</b> are kept between runs; spend them in the Archive on new wardens, card caches, gems, relics, locations and perks.</p>
-  <p><b>Evolution.</b> Apply an <b>Evo Gem</b> to an Evo base card at a Gem node or Shop. Bring that card and its catalyst to a Forge to evolve the base and consume the catalyst.</p>
+  <p><b>Evolution.</b> Gem nodes and Shops offer an <b>Evo Gem</b> when you have a base card and its catalyst. Choose the pair to evolve the base card immediately. The catalyst is consumed, and the evolved card keeps its sockets and gems.</p>
   <button class="btn primary" data-a="title">Back</button></div></div>`;
 
 SCREENS.wardens = () => {
@@ -134,7 +133,7 @@ SCREENS.wardens = () => {
   }).join('')}</div>
   <div class="heat"><h3>Heat ${G.heat}</h3>
     <div class="row"><button class="btn sm" data-a="heat" data-d="-1" ${G.heat <= 0 ? 'disabled' : ''}>−</button>
-    <div class="heat-list">${G.heat ? HEAT.slice(0, G.heat).map((h) => `<div>🔥 ${h.text}</div>`).join('') : '<div class="dim">No modifiers. Win a run to unlock Heat.</div>'}</div>
+    <div class="heat-list">${G.heat ? HEAT.filter((h) => h.lvl <= G.heat).map((h) => `<div>🔥 ${h.text}</div>`).join('') : '<div class="dim">No modifiers. Win a run to unlock Heat.</div>'}</div>
     <button class="btn sm" data-a="heat" data-d="1" ${G.heat >= G.meta.maxHeat ? 'disabled' : ''}>+</button></div></div>
   <div class="row end"><button class="btn ghost" data-a="title">Back</button><button class="btn big primary" data-a="startRun">Begin Run</button></div>
   </div></div>`;
@@ -227,7 +226,7 @@ function handCard(b, hc) {
   const playable = [0, 1, 2].some((l) => b.canPlay(hc.hid, l).ok);
   const pw = b.handPower(hc);
   return `<div class="hc ${G.sel === hc.hid ? 'sel' : ''} ${playable ? 'ok' : 'no'}" data-hid="${hc.hid}">
-    <img class="card" draggable="false" src="${cardURL(hc.def, { cost, plus: hc.inst?.plus, sockets: hc.inst?.sockets || [], bonus: hc.inst?.bonus, power: pw })}">
+    <img class="card" draggable="false" src="${cardURL(hc.def, { cost, plus: hc.inst?.plus, sockets: hc.inst?.sockets, bonus: hc.inst?.bonus, power: pw })}">
   </div>`;
 }
 function battleResultHtml() {
@@ -237,7 +236,6 @@ function battleResultHtml() {
     <div class="lanes-res">${res.laneResults.map((lr, i) => `<div class="lr ${lr.won ? 'w' : lr.lost ? 'l' : 't'}"><small>${i === 1 ? 'Home' : i === 0 ? 'Left' : 'Right'}</small><b>${lr.player}</b><span>vs</span><b>${lr.enemy}</b></div>`).join('')}</div>
     <p>${res.lanesWon} won · ${res.lanesLost} lost${res.tiebreak ? ' — decided by total Power' : ''}.</p>
     ${out ? `<p class="gains"><span>+${out.gold} gold</span> <span>+${out.shards} ✦</span>${out.heartLost ? ' <span class="bad">−1 heart</span>' : ''}</p>
-    ${out.relic ? `<p>Relic: <b>${esc(RELICS[out.relic].name)}</b></p>` : ''}
     ${out.notes.map((n) => `<p class="dim">${esc(n)}</p>`).join('')}` : ''}
     <button class="btn big primary" data-a="afterBattle">Continue</button></div></div>`;
 }
@@ -397,11 +395,11 @@ SCREENS.reward = () => {
     </div></div></div>`;
 };
 function evoHint(id) {
-  const r = G.run;
+  const deck = G.run?.deck || [];
   const asBase = EVO_RECIPES.find((e) => e.base === id); const asCat = EVO_RECIPES.filter((e) => e.catalyst === id);
   const parts = [];
-  if (asBase) parts.push(`Evo base: + ${CARDS[asBase.catalyst].name}${r.deck.some((c) => c.id === asBase.catalyst) ? ' ✔' : ''}`);
-  for (const e of asCat) parts.push(`Catalyst for ${CARDS[e.base].name}${r.deck.some((c) => c.id === e.base) ? ' ✔' : ''}`);
+  if (asBase) parts.push(`Evo base: + ${CARDS[asBase.catalyst].name}${deck.some((c) => c.id === asBase.catalyst) ? ' ✔' : ''}`);
+  for (const e of asCat) parts.push(`Catalyst for ${CARDS[e.base].name}${deck.some((c) => c.id === e.base) ? ' ✔' : ''}`);
   return parts.length ? `<small class="evohint">✦ ${parts.map(esc).join(' · ')}</small>` : '';
 }
 function relicCard(id, attrs = '') { const rl = RELICS[id]; return `<div class="relic-card" ${attrs}><img src="${glyphURL(rl.icon, 96, '#3a2f48')}"><b>${esc(rl.name)}</b><small>${esc(rl.text)}</small><em>${rl.rarity}</em></div>`; }
@@ -414,7 +412,8 @@ SCREENS.shop = () => {
     <div class="shop-cards">${s.items.map((it, i) => it.kind !== 'card' ? '' : `<div class="shop-item ${it.sold ? 'sold' : ''}">${cardImg(it.id, {}, `data-a="buy" data-i="${i}"`)}<span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : it.price + 'g'}</span>${evoHint(it.id)}</div>`).join('')}</div>
     <div class="shop-row">${s.items.map((it, i) => {
       if (it.kind === 'gem') {
-        const fits = r.deck.some((card) => R.canSocket(card, it.id));
+        const fits = R.canOfferGem(r, it.id);
+        if (GEMS[it.id].evo && !fits && !it.sold) return '';
         return `<button class="shop-mini ${it.sold ? 'sold' : ''}" data-a="buy" data-i="${i}" ${it.sold || !fits || r.gold < it.price ? 'disabled' : ''}>${gemChip(it.id)}<small>${esc(GEMS[it.id].text)}</small><span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : !fits ? 'No compatible socket' : it.price + 'g'}</span></button>`;
       }
       if (it.kind === 'relic') return `<div class="shop-mini ${it.sold ? 'sold' : ''}" data-a="buy" data-i="${i}"><img src="${glyphURL(RELICS[it.id].icon, 56, '#3a2f48')}"><b>${esc(RELICS[it.id].name)}</b><small>${esc(RELICS[it.id].text)}</small><span class="price ${r.gold < it.price ? 'bad' : ''}">${it.sold ? 'Sold' : it.price + 'g'}</span></div>`;
@@ -426,31 +425,23 @@ SCREENS.shop = () => {
 };
 
 SCREENS.gem = () => {
-  const { node } = G.run;
+  const r = G.run;
+  const choices = r.node.gemChoices.filter((id) => R.canOfferGem(r, id));
   return `${topbar()}<div class="screen scroll center"><div class="panel wide">
-    <h2>Gem Cache</h2><p>${node.gemChoices.length ? 'Choose a gem, then choose a card to socket it into.' : 'Your deck has no compatible empty sockets.'}</p>
-    <div class="shop-row">${node.gemChoices.map((id) => `<button class="shop-mini" data-a="chooseGem" data-id="${id}">${gemChip(id)}<small>${esc(GEMS[id].text)}</small></button>`).join('')}</div>
+    <h2>Gem Cache</h2><p>${choices.length ? 'Choose a gem to use now.' : 'Your deck has no compatible gems here.'}</p>
+    <div class="shop-row">${choices.map((id) => `<button class="shop-mini" data-a="chooseGem" data-id="${id}">${gemChip(id)}<small>${esc(GEMS[id].text)}</small></button>`).join('')}</div>
     <div class="row end"><button class="btn ghost" data-a="leaveNode">Leave</button></div></div></div>`;
 };
 
 SCREENS.forge = () => {
-  const r = G.run; const st = r.node; const evo = R.evoOptions(r); const fuse = R.fuseOptions(r);
-  const tab = st.tab === 'fuse' ? 'fuse' : 'evolve';
-  const canBore = !st.bored && (r.perks.includes('perk_forgecraft') || r.gold >= 40);
-  let body = '';
-  if (tab === 'evolve') {
-    body = evo.length ? `<div class="evo-list">${evo.map((o) => `<div class="evo ${o.ready ? 'ready' : ''}">
-        ${instImg(r.deck.find((c) => c.uid === o.uid))}<span class="plus">+</span>${cardImg(o.recipe.catalyst, {}, `class="card ${o.catalystUid ? '' : 'missing'}"`)}<span class="plus">=</span>${cardImg(o.recipe.result)}
-        <div>${o.hasGem ? '✔ Evo Gem socketed' : '✘ Needs an Evo Gem in an empty socket'}<br>${o.catalystUid ? '✔ Catalyst owned' : '✘ Catalyst not in deck'}<br>
-        ${o.ready ? `<button class="btn primary" data-a="evolve" data-uid="${o.uid}">Evolve!</button>` : ''}</div></div>`).join('')}</div>` : '<p class="dim">None of your cards are Evo bases. Bases include: ' + EVO_RECIPES.map((e) => CARDS[e.base].name).join(', ') + '.</p>';
-  } else {
-    body = fuse.length ? `<p>Fuse two copies into one upgraded (+) card. Their gems must fit together in the result.</p><div class="evo-list">${fuse.map((f) => `<div class="evo ready">${instImg(r.deck.find((c) => c.uid === f.a))}<span class="plus">+</span>${instImg(r.deck.find((c) => c.uid === f.b))}<span class="plus">=</span>${cardImg(f.id, { plus: 1 })}<button class="btn primary" data-a="fuse" data-a1="${f.a}" data-b1="${f.b}">Fuse</button></div>`).join('')}</div>` : '<p class="dim">Fusion needs two un-upgraded copies with room for their combined gems.</p>';
-  }
+  const r = G.run;
+  const fuse = R.fuseOptions(r);
   return `${topbar()}<div class="screen scroll"><div class="panel wide">
-    <h2>The Forge</h2>
-    <div class="tabs">${['evolve', 'fuse'].map((t) => `<button class="tab ${tab === t ? 'on' : ''}" data-a="forgeTab" data-t="${t}">${t[0].toUpperCase() + t.slice(1)}${t === 'evolve' && evo.some((o) => o.ready) ? ' ✦' : ''}</button>`).join('')}</div>
-    ${body}
-    <div class="row end"><button class="btn" data-a="forgeBore" ${canBore ? '' : 'disabled'}>Bore a socket ${r.perks.includes('perk_forgecraft') ? '(free once)' : '(40g)'}</button><button class="btn primary" data-a="leaveNode">Leave Forge</button></div></div></div>`;
+    <h2>Fuse</h2><p>Combine two unupgraded copies into one upgraded card. Their gems must fit in the result.</p>
+    ${fuse.length ? `<div class="evo-list">${fuse.map((f) => `<div class="evo ready">
+      ${instImg(r.deck.find((c) => c.uid === f.a))}<span class="plus">+</span>${instImg(r.deck.find((c) => c.uid === f.b))}<span class="plus">=</span>${cardImg(f.id, { plus: 1, bonus: f.bonus, sockets: f.sockets })}
+      <button class="btn primary" data-a="fuse" data-a1="${f.a}" data-b1="${f.b}">Fuse</button></div>`).join('')}</div>` : '<p class="dim">No pairs in your deck can be fused.</p>'}
+    <div class="row end"><button class="btn primary" data-a="leaveNode">Leave</button></div></div></div>`;
 };
 
 const pickerScreen = (title, desc, filter, action, leaveLabel = 'Leave') => () => {
@@ -461,13 +452,12 @@ const pickerScreen = (title, desc, filter, action, leaveLabel = 'Leave') => () =
 };
 SCREENS.purge = pickerScreen('Shrine of Ash', 'Choose a card to burn away forever.', () => true, 'purgeCard');
 SCREENS.mirror = pickerScreen('Mirror Pool', 'Choose a card to duplicate (gems are not copied).', (c) => !cardDef(c.id).token, 'mirrorCard');
-SCREENS.campUpgrade = pickerScreen('Campfire — Upgrade', 'Choose a card to upgrade (+2 Power).', (c) => !c.plus && !cardDef(c.id).token, 'upgradeCard', 'Back');
 SCREENS.camp = () => {
   const r = G.run;
+  const restored = r.node.heartsRestored;
   return `${topbar()}<div class="screen center"><div class="panel">
-    <h2>Campfire</h2><p>The fire crackles. Rest, or sharpen your deck.</p>
-    <div class="row center"><button class="btn big" data-a="campHeal" ${r.hearts >= r.maxHearts ? 'disabled' : ''}>Rest (+1 heart)</button>
-    <button class="btn big primary" data-a="campUpgradeScreen">Upgrade a card</button></div></div></div>`;
+    <h2>Campfire</h2><p>${restored ? `Restored ${restored} ${restored === 1 ? 'heart' : 'hearts'}.` : 'Your hearts are full.'}</p>
+    <button class="btn primary" data-a="leaveNode">Continue</button></div></div>`;
 };
 SCREENS.treasure = () => {
   const st = G.run.node;
@@ -482,16 +472,6 @@ SCREENS.home = () => {
     <div class="relic-choices">${st.choices.map((id) => `<div class="relic-card" data-a="pickHome" data-id="${id}"><img src="${glyphURL(HOME_UPGRADES[id].icon, 96, '#4a2a6a')}"><b>${esc(HOME_UPGRADES[id].name)}</b><small>${esc(HOME_UPGRADES[id].text)}</small></div>`).join('')}</div>
     <div class="row end"><button class="btn ghost" data-a="leaveNode">Skip</button></div></div></div>`;
 };
-SCREENS.event = () => {
-  const r = G.run; const st = r.node; const ev = EVENTS.find((e) => e.id === st.event);
-  return `${topbar()}<div class="screen scroll center"><div class="panel event">
-    <img class="eventart" src="${artURL(ev.art, 'event' + ev.id)}">
-    <h2>${esc(ev.title)}</h2><p>${esc(ev.text)}</p>
-    ${st.result != null ? `<p class="result-text">${esc(st.result)}</p><button class="btn primary" data-a="leaveNode">Continue</button>` :
-      `<div class="menu-col">${ev.choices.map((c, i) => `<button class="btn" data-a="eventChoice" data-i="${i}" ${c.can && !c.can(r) ? 'disabled' : ''}>${esc(c.label)}</button>`).join('')}</div>`}
-  </div></div>`;
-};
-
 SCREENS.summary = () => {
   const s = G.summary; const r = s.run;
   return `<div class="screen scroll center"><div class="panel ${s.victory ? 'win' : 'lose'}">
@@ -528,7 +508,7 @@ SCREENS.codex = () => {
   if (G.codexTab === 'Cards') body = `<div class="deckgrid small">${CARD_LIST.filter((c) => !c.evo).map((c) => un.has(c.set) || c.set === 'core' ? cardImg(c.id, {}, `data-a="inspectDef" data-id="${c.id}"`) : `<div class="card lockedcard"><span>🔒</span><small>${esc(UNLOCK_MAP[c.set]?.name || 'Locked')}</small></div>`).join('')}</div>`;
   if (G.codexTab === 'Evolutions') body = `<div class="evo-list">${EVO_RECIPES.map((e) => `<div class="evo">${cardImg(e.base)}<span class="plus">+</span>${cardImg(e.catalyst)}<span class="plus">=</span>${G.meta.recipes[e.result] ? cardImg(e.result, {}, `data-a="inspectDef" data-id="${e.result}"`) : '<div class="card lockedcard"><span>?</span><small>Evolve to discover</small></div>'}</div>`).join('')}</div>`;
   if (G.codexTab === 'Relics') body = `<div class="relic-choices">${RELIC_LIST.map((r) => (un.has(r.unlock) || !r.unlock ? relicCard(r.id) : `<div class="relic-card locked"><b>🔒 ${esc(r.name)}</b><small>${esc(UNLOCK_MAP[r.unlock]?.name)}</small></div>`)).join('')}</div>`;
-  if (G.codexTab === 'Enemies') body = `<div class="enemy-list">${Object.values(OPPONENTS).map((o) => `<div class="enemy-entry ${o.tier}"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${o.tier === 'boss' ? 'Boss' : o.tier === 'elite' ? 'Elite' : 'Act ' + o.acts.join('–')}</small><p>${esc(o.boss ? BOSSES[o.boss].text : o.text)}</p></div></div>`).join('')}</div>`;
+  if (G.codexTab === 'Enemies') body = `<div class="enemy-list">${Object.values(OPPONENTS).map((o) => `<div class="enemy-entry ${o.tier}"><img src="${enemyURL(o.portrait)}"><div><b>${esc(o.name)}</b> <small>${o.tier === 'boss' ? 'Boss' : 'Act ' + o.acts.join('–')}</small><p>${esc(o.boss ? BOSSES[o.boss].text : o.text)}</p></div></div>`).join('')}</div>`;
   if (G.codexTab === 'Locations') body = `<div class="enemy-list">${LOCATION_LIST.map((l) => `<div class="enemy-entry"><img src="${artURL({ f: 'none', bg: l.art.bg, pal: l.art.pal }, 'loc' + l.id)}"><div><b>${esc(l.name)}</b>${l.unlock && !un.has(l.unlock) ? ' 🔒' : ''}<p>${esc(l.text)}</p></div></div>`).join('')}</div>`;
   if (G.codexTab === 'Home') body = `<div class="relic-choices">${Object.values(HOME_UPGRADES).map((h) => `<div class="relic-card"><img src="${glyphURL(h.icon, 96, '#4a2a6a')}"><b>${esc(h.name)}</b><small>${esc(h.text)}</small></div>`).join('')}</div>`;
   return `<div class="screen scroll"><div class="panel wide"><h2>Codex</h2>
@@ -553,8 +533,9 @@ function modalHtml() {
     const b = G.battle; const bc = b.findCard(m.bid);
     if (!bc) { G.modal = null; return ''; }
     const kws = (bc.def.tags || []).filter((t) => KEYWORDS[t]).map((t) => `<p><b>${KEYWORDS[t][0]}</b>: ${KEYWORDS[t][1]}</p>`).join('');
-    inner = `<div class="inspect"><img class="card big" src="${cardURL(bc.def, { power: b.power(bc), plus: bc.inst?.plus, sockets: bc.inst?.sockets || [], bonus: bc.inst?.bonus })}"><div>
+    inner = `<div class="inspect"><img class="card big" src="${cardURL(bc.def, { power: b.power(bc), plus: bc.inst?.plus, sockets: bc.inst?.sockets, bonus: bc.inst?.bonus })}"><div>
       <p>Base ${bc.base} · Buffs ${bc.buff >= 0 ? '+' : ''}${bc.buff} · Auras ${bc.aura >= 0 ? '+' : ''}${bc.aura}</p>${kws}
+      ${(bc.inst?.sockets || []).filter(Boolean).map((g) => `<p>${gemChip(g)} ${esc(GEMS[g].text)}</p>`).join('')}
       ${b.canMoveCard(bc) ? `<button class="btn primary" data-a="startMove" data-bid="${bc.bid}">Move this card</button>` : ''}</div></div>`;
   }
   if (m.type === 'opponent') {
@@ -569,6 +550,12 @@ function modalHtml() {
   }
   if (m.type === 'relic') { inner = relicCard(m.id); }
   if (m.type === 'pick') inner = `<h2>${esc(m.title)}</h2>${m.gem ? `<p>${gemChip(m.gem)} ${esc(GEMS[m.gem].text)}</p>` : ''}<div class="deckgrid">${sortDeck(r.deck).filter(m.filter || (() => true)).map((c) => instImg(c, `data-a="modalPick" data-uid="${c.uid}"`)).join('')}</div>`;
+  if (m.type === 'evoGem') inner = `<h2>Use an Evo Gem</h2>
+    <p>Choose a pair. The evolved card keeps the base card’s gems. The catalyst and its gems are consumed.</p>
+    <div class="evo-list">${R.evoOptions(r).map(({ base, catalyst, recipe }) => `<div class="evo ready">
+      ${instImg(base)}<span class="plus">+</span>${instImg(catalyst)}<span class="plus">→</span>${instImg({ ...base, id: recipe.result })}
+      <button class="btn primary" data-a="confirmEvo" data-uid="${base.uid}" data-catalyst="${catalyst.uid}">Evolve${m.price == null ? '' : ` · ${m.price}g`}</button>
+    </div>`).join('')}</div>`;
   if (m.type === 'menu') inner = `<h2>Paused</h2><div class="menu-col"><button class="btn" data-a="closeModal">Resume</button><button class="btn" data-a="howtoModal">How to Play</button><button class="btn" data-a="toggleSound">Sound: ${G.meta.settings.sound ? 'On' : 'Off'}</button><button class="btn" data-a="saveQuit">Save & Quit to Title</button><button class="btn bad" data-a="abandon">Abandon Run</button></div>`;
   if (m.type === 'help') inner = `<h2>Battle Basics</h2><div class="prose"><p>Drag a card onto a lane (or tap a card, then tap a lane). Win <b>2 of 3</b> lanes after ${G.battle?.maxTurns || 6} turns.</p><p>Energy = turn number. Played cards stay face-down until <b>End Turn</b>, then both sides reveal. Tap a face-down card to take it back.</p><p>The badges show each side's Power per lane (green = you're winning). Tap a revealed card to inspect or <b>Move</b> it; tap the opponent's portrait to see their info.</p></div>`;
   return `<div class="overlay" data-a="closeModalBg"><div class="panel modal ${m.type}">${inner}<button class="btn closex" data-a="closeModal">✕</button></div></div>`;
@@ -642,7 +629,7 @@ function openNode(n, resumed = false) {
   if (n.type === 'gem' && !st.gemChoices) st.gemChoices = R.rollGemChoices(r);
   if (n.type === 'treasure' && !st.relicRolled) { st.relicRolled = true; st.relic = R.gainRandomRelicId(r); st.gold = 25 + R.rngFor(r).int(0, 25); r.gold += st.gold; }
   if (n.type === 'home' && !st.choices) st.choices = R.homeChoices(r, 3);
-  if (n.type === 'event' && !st.event) st.event = R.rollEvent(r);
+  if (n.type === 'camp') R.restAtCamp(r);
   persist();
   if (n.enc) { startBattle(n); return; }
   go(n.type);
@@ -714,9 +701,15 @@ function finishRun() {
 }
 
 // shop
-function chooseGemCard(id, title, apply) {
+function chooseGemTarget(id, price, apply) {
+  if (!R.canOfferGem(G.run, id)) { sfx.error(); return; }
+  if (GEMS[id].evo) {
+    G.modal = { type: 'evoGem', price, onPick: apply };
+    render();
+    return;
+  }
   const filter = (card) => R.canSocket(card, id);
-  if (!G.run.deck.some(filter)) { sfx.error(); toast('No compatible empty sockets.'); return; }
+  const title = `Socket ${GEMS[id].name}${price == null ? '' : ` · ${price}g`}`;
   G.modal = { type: 'pick', title, gem: id, filter, onPick: apply };
   render();
 }
@@ -726,8 +719,11 @@ A.buy = (d) => {
   if (!it || it.sold) return;
   if (r.gold < it.price) { sfx.error(); toast('Not enough gold.'); return; }
   if (it.kind === 'gem') {
-    chooseGemCard(it.id, `Socket ${GEMS[it.id].name} · ${it.price}g`, (uid) => {
-      if (R.buy(r, shop, idx, uid)) { sfx.coin(); persist(); toast('Gem socketed.'); }
+    chooseGemTarget(it.id, it.price, (uid, catalystUid) => {
+      if (R.buy(r, shop, idx, uid, { meta: G.meta, catalystUid })) {
+        if (catalystUid) sfx.evolve(); else sfx.coin();
+        persist(); toast(catalystUid ? 'Card evolved.' : 'Gem socketed.');
+      }
     });
     return;
   }
@@ -736,9 +732,17 @@ A.buy = (d) => {
 A.chooseGem = (d) => {
   const r = G.run;
   if (r.node.type !== 'gem' || !r.node.gemChoices.includes(d.id)) return;
-  chooseGemCard(d.id, `Socket ${GEMS[d.id].name}`, (uid) => {
-    if (R.claimGem(r, d.id, uid)) { sfx.buff(); A.leaveNode(); toast('Gem socketed.'); }
+  chooseGemTarget(d.id, null, (uid, catalystUid) => {
+    if (R.claimGem(r, d.id, uid, { meta: G.meta, catalystUid })) {
+      if (catalystUid) sfx.evolve(); else sfx.buff();
+      A.leaveNode(); toast(catalystUid ? 'Card evolved.' : 'Gem socketed.');
+    }
   });
+};
+A.confirmEvo = (d) => {
+  const m = G.modal;
+  if (m?.type !== 'evoGem') return;
+  G.modal = null; m.onPick(d.uid, d.catalyst); render();
 };
 A.shopRemove = () => {
   const r = G.run; const s = r.node.shop; if (s.removeUsed) return;
@@ -748,29 +752,12 @@ A.shopRemove = () => {
 };
 A.modalPick = (d) => { const m = G.modal; G.modal = null; m.onPick(d.uid); render(); };
 
-// forge
-A.forgeTab = (d) => { G.run.node.tab = d.t; render(); };
-A.forgeBore = () => {
-  const r = G.run; const free = r.perks.includes('perk_forgecraft');
-  if (r.node.bored || (!free && r.gold < 40)) return;
-  G.modal = { type: 'pick', title: 'Bore a socket into…', filter: (c) => c.sockets.length < 3 && !cardDef(c.id).token, onPick: (uid) => { if (!R.boreSocket(r, uid)) return; if (!free) r.gold -= 40; r.node.bored = true; sfx.buff(); persist(); } };
-  render();
-};
-A.evolve = (d) => { const c = R.evolve(G.run, G.meta, d.uid); if (c) { sfx.evolve(); persist(); toast(`Evolved into ${CARDS[c.id].name}!`); } };
-A.fuse = (d) => { const c = R.fuse(G.run, d.a1, d.b1); if (c) { sfx.evolve(); persist(); toast(`${CARDS[c.id].name}+ forged.`); } };
+A.fuse = (d) => { const c = R.fuse(G.run, d.a1, d.b1); if (c) { sfx.evolve(); persist(); toast(`${CARDS[c.id].name}+ fused.`); } };
 
 // other nodes
 A.purgeCard = (d) => { R.removeCard(G.run, d.uid); sfx.destroy(); A.leaveNode(); toast('Card removed.'); };
 A.mirrorCard = (d) => { const n = R.cloneCard(G.run, d.uid); sfx.evolve(); A.leaveNode(); toast(`${CARDS[n.id]?.name || 'Card'} duplicated.`); };
-A.campHeal = () => { const r = G.run; r.hearts = Math.min(r.maxHearts, r.hearts + 1); sfx.buff(); A.leaveNode(); toast('You feel rested.'); };
-A.campUpgradeScreen = () => go('campUpgrade');
-A.upgradeCard = (d) => { R.upgradeCard(G.run, d.uid); sfx.buff(); A.leaveNode(); toast('Card upgraded.'); };
 A.pickHome = (d) => { G.run.home.push(d.id); sfx.evolve(); A.leaveNode(); toast(`${HOME_UPGRADES[d.id].name} built.`); };
-A.eventChoice = (d) => {
-  const r = G.run; const ev = EVENTS.find((e) => e.id === r.node.event); const c = ev.choices[+d.i];
-  if (c.can && !c.can(r)) return;
-  r.node.result = c.apply(R.eventApi(r)) || ''; sfx.click(); persist(); render();
-};
 
 // event delegation
 root.addEventListener('click', (e) => {

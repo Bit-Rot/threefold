@@ -98,7 +98,6 @@ b { color: #fff; }
 .node.here img { border-color: #fff; }
 .node.sel img { box-shadow: 0 0 0 4px #fff, 0 0 20px #ffc070; }
 .node.boss img { width: 70px; height: 70px; border-color: #ff4060; }
-.node.elite img { border-color: #ff9040; }
 .node.gem img { border-color: #d68dfa; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 193, 78, 0.6); } 50% { box-shadow: 0 0 0 8px rgba(242, 193, 78, 0); } }
 .preview {
@@ -205,12 +204,8 @@ img.card { width: 100%; display: block; border-radius: 6%; cursor: pointer; }
 .evo-list { display: flex; flex-direction: column; gap: 12px; }
 .evo { display: flex; align-items: center; gap: 8px; background: rgba(0, 0, 0, 0.25); border-radius: 14px; padding: 8px; flex-wrap: wrap; }
 .evo img.card, .evo .lockedcard { width: min(110px, 22vw); }
-.evo img.card.missing { opacity: 0.35; }
 .evo .plus { font-size: 28px; color: var(--gold2); font-weight: 900; }
 .evo.ready { border: 1px solid #ff5fd2; box-shadow: 0 0 20px rgba(255, 95, 210, 0.25); }
-.event { text-align: center; }
-.eventart { width: min(260px, 70vw); border-radius: 16px; border: 2px solid var(--line); }
-.result-text { color: var(--gold2); font-weight: 700; }
 .stats { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .stats div { background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 8px 14px; display: flex; flex-direction: column; }
 .stats b { font-size: 22px; }
@@ -264,7 +259,6 @@ img.card { width: 100%; display: block; border-radius: 6%; cursor: pointer; }
 .opp-row { display: flex; gap: 10px; align-items: center; text-align: left; }
 .opp-row img { width: 72px; height: 72px; border-radius: 12px; border: 2px solid #ff6080; flex-shrink: 0; }
 .opp-row p { margin: 2px 0; font-size: 14px; color: var(--dim); }
-.enemy-entry.elite img { border-color: #ff9040; }
 @media (max-width: 640px) {
   .oppinfo span small { display: none; }
   .oppinfo img { width: 30px; height: 30px; }

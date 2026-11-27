@@ -142,7 +142,7 @@ export class Board {
       if (!bc) continue;
       live.add(bc.bid);
       let m = this.cards.get(bc.bid);
-      const cv = cardCanvas(bc.def, { power: bc.revealed ? b.power(bc) : undefined, plus: bc.inst?.plus, sockets: bc.inst?.sockets || [], bonus: bc.inst?.bonus });
+      const cv = cardCanvas(bc.def, { power: bc.revealed ? b.power(bc) : undefined, plus: bc.inst?.plus, sockets: bc.inst?.sockets, bonus: bc.inst?.bonus });
       if (!m) {
         m = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), new THREE.MeshStandardMaterial({ map: texOf(cv), roughness: 0.5, transparent: true }));
         m.rotation.x = -Math.PI / 2;

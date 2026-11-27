@@ -74,7 +74,7 @@ export class Battle {
     // decks
     this.S[PLAYER].deck = this.rng.shuffle(run.deck.map((inst) => this.makeHandCard(inst, null, PLAYER)));
     const bonus = encounter.bonus || 0;
-    const oppDeck = (this.opp?.deck || []).map((id, k) => ({ uid: 'e' + k, id, plus: encounter.plus && k % 2 === 0 ? 1 : 0, bonus, sockets: [] }));
+    const oppDeck = (this.opp?.deck || []).map((id, k) => ({ uid: 'e' + k, id, plus: encounter.plus && k % 2 === 0 ? 1 : 0, bonus, sockets: [null] }));
     this.S[ENEMY].deck = this.rng.shuffle(oppDeck.map((inst) => this.makeHandCard(inst, null, ENEMY)));
   }
 
@@ -456,7 +456,7 @@ export class Battle {
 
   queueCard(def, inst = null, costMod = 0) {
     if (this.side.nextHand.length >= MAX_HAND - DRAW_PER_TURN) return null;
-    const hc = this.makeHandCard(inst || { id: def.id, uid: 'tmp' + BID, temp: true, sockets: [] }, def);
+    const hc = this.makeHandCard(inst || { id: def.id, uid: 'tmp' + BID, temp: true, sockets: def.token ? [] : [null] }, def);
     hc.costMod = costMod;
     this.side.nextHand.push(hc);
     return hc;

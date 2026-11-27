@@ -39,23 +39,6 @@ opp('scrap_hauler', 'Scrap Haulers', 'Garbage gang', 'junkline', 'basic', [3],
   ['clockwork_squire', 'spearman', 'forge_guard', 'slinger', 'twin_blades', 'ice_sentry', 'watchtower', 'guardian', 'catapult', 'hill_ogre', 'bulwark_golem', 'stone_giant'],
   { text: 'Defends its lanes with Constructs and heavy artillery.' });
 
-// ---- Elites (stronger decks + a passive) ----
-opp('elite_ram', 'Siege Ram', 'Elite', 'siege', 'elite', [1, 2, 3],
-  ['arbalest', 'slinger', 'saboteur', 'siegecrafter', 'ballista', 'guardian', 'catapult', 'thunder_hawk', 'hill_ogre', 'storm_caller', 'doom_trebuchet', 'stone_giant'],
-  { text: 'Passive: its Strikes deal +1.', ongoing(b) { b.strikeBonus += 1; } });
-opp('elite_bandit', 'Bandit Engine', 'Elite', 'reel', 'elite', [1, 2, 3],
-  ['prospector', 'golden_hen', 'alchemist', 'scholar', 'mimic', 'echo_bard', 'guardian', 'merchant', 'hill_ogre', 'gilded_dragon', 'sun_titan', 'stone_giant'],
-  { text: 'Passive: draws an extra card each turn.', turnStart(b) { if (b.turn > 1) b.drawCards(1); } });
-opp('elite_hauler', 'Scrap Colossus', 'Elite', 'junkline', 'elite', [2, 3],
-  ['slinger', 'forge_guard', 'twin_blades', 'clockwork_squire', 'ice_sentry', 'cog_marshal', 'guardian', 'catapult', 'storm_caller', 'bulwark_golem', 'mountain_king', 'stone_giant'],
-  { text: 'Passive: start of fight, a Junk appears on your side of every lane.', battleStart(b) { for (let i = 0; i < 3; i++) b.spawn('junk', i, 0, 0); } });
-opp('elite_leech', 'Leech Queen', 'Elite', 'leech', 'elite', [2, 3],
-  ['ashling', 'ashling', 'cinder_imp', 'pyre_priest', 'gravedigger', 'grave_knight', 'phoenix_chick', 'soulbinder', 'hill_ogre', 'bone_colossus', 'abyss_maw', 'ashen_phoenix'],
-  { text: 'Passive: end of turn, drains 1 Power from your strongest card.', endTurn(b) { const c = b.allCards(0).sort((a, d) => b.power(d) - b.power(a))[0]; if (c) b.buff(c, -1); } });
-opp('elite_patron', 'The Patron', 'Elite', 'commission', 'elite', [2, 3],
-  ['lantern_keeper', 'sprite', 'war_banner', 'knight_captain', 'grand_choir', 'guardian', 'beacon', 'banner_knight', 'bulwark_golem', 'queen_thorns', 'sun_lantern', 'sun_titan'],
-  { text: 'Passive: its Ongoing cards have +1 Power.', ongoing(b) { for (const l of b.lanes) l.flags.ongoingBonus += 1; } });
-
 // ---- Bosses ----
 opp('boss_conductor', 'The Conductor', 'Boss 1', 'baton', 'boss', [1],
   ['recruit', 'sprite', 'drummer', 'drummer', 'lantern_keeper', 'war_banner', 'guardian', 'banner_knight', 'hill_ogre', 'grand_choir', 'bulwark_golem', 'stone_giant'],
@@ -141,9 +124,7 @@ export const BOSSES = {
   },
 };
 
-export const ACT_POOLS = {
-  1: { basic: Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(1)).map((o) => o.id), elite: Object.values(O).filter((o) => o.tier === 'elite' && o.acts.includes(1)).map((o) => o.id) },
-  2: { basic: Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(2)).map((o) => o.id), elite: Object.values(O).filter((o) => o.tier === 'elite' && o.acts.includes(2)).map((o) => o.id) },
-  3: { basic: Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(3)).map((o) => o.id), elite: Object.values(O).filter((o) => o.tier === 'elite' && o.acts.includes(3)).map((o) => o.id) },
-};
+export const ACT_POOLS = Object.fromEntries([1, 2, 3].map((act) => [act,
+  Object.values(O).filter((o) => o.tier === 'basic' && o.acts.includes(act)).map((o) => o.id),
+]));
 export const BOSS_ORDER = ['boss_conductor', 'boss_archivist', 'boss_rust', 'boss_brood', 'boss_frost', 'boss_leviathan', 'boss_furnace', 'boss_engine'];

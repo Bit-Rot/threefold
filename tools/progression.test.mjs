@@ -3,7 +3,6 @@ import test from 'node:test';
 import { defaultMeta } from '../src/core/save.js';
 import { CARDS, CARD_LIST, TRIBES } from '../src/data/cards.js';
 import { BOSS_ORDER, OPPONENTS } from '../src/data/enemies.js';
-import { EVENTS } from '../src/data/events.js';
 import { WARDEN_LIST } from '../src/data/wardens.js';
 import { Battle, DRAW_PER_TURN, MAX_HAND } from '../src/engine/battle.js';
 import * as R from '../src/engine/run.js';
@@ -94,7 +93,7 @@ test('map migration updates unstarted stages and preserves a route already in us
   run.map.rows.shift();
   R.migrateRun(run);
   assert.deepEqual(run.map.rows.map((row) => row.length), [1, 2, 2, 1]);
-  assert.equal(run.v, 4);
+  assert.equal(run.v, 5);
 
   run.v = 2;
   run.map.rows.shift();
@@ -162,7 +161,7 @@ test('Junk cards leave the card catalogue, decks, and existing saved offers', ()
 
 test('fight rewards spread across energy costs and keep the encounter rarity floor', () => {
   const band = (id) => Math.ceil(CARDS[id].cost / 2);
-  const floors = { battle: ['common', 'uncommon', 'rare', 'legendary'], elite: ['uncommon', 'rare', 'legendary'], boss: ['rare', 'legendary'] };
+  const floors = { battle: ['common', 'uncommon', 'rare', 'legendary'], boss: ['rare', 'legendary'] };
   for (const [kind, rarities] of Object.entries(floors)) {
     const run = newRun();
     const twoCardBands = new Set();
@@ -214,53 +213,104 @@ test('shop gems are charged only once and only when an eligible card is socketed
   assert.equal(run.gold, 15);
 });
 
-test('only an open Gem node can grant its offer, and Evo Gems require a base card', () => {
+test('Evo Gems offer and complete an evolution at the Gem node', () => {
   const run = newRun();
+  const meta = defaultMeta();
   const ordinary = run.deck.find((c) => c.id === 'spearman');
   const base = run.deck.find((c) => c.id === 'recruit');
+  const catalyst = run.deck.find((c) => c.id === 'drummer');
+  run.deck = [base, ordinary];
+  assert.equal(R.canOfferGem(run, 'evo'), false);
+  for (let i = 0; i < 20; i++) {
+    assert.ok(!R.rollGemChoices(run).includes('evo'));
+    assert.ok(!R.rollShop(run).items.some((item) => item.id === 'evo'));
+  }
   run.node = { type: 'gem', done: false, gemChoices: ['evo', 'thrift'] };
   assert.equal(R.claimGem(run, 'ember', ordinary.uid), false);
-  assert.equal(R.claimGem(run, 'evo', ordinary.uid), false);
-  assert.ok(R.canSocket(base, 'evo'));
-  assert.equal(R.claimGem(run, 'evo', base.uid), true);
-  assert.equal(R.claimGem(run, 'thrift', ordinary.uid), false);
-  assert.deepEqual(base.sockets, ['evo']);
+  assert.equal(R.claimGem(run, 'evo', base.uid, { meta, catalystUid: catalyst.uid }), false);
+  assert.equal(run.node.done, false);
+  run.deck.push(catalyst);
+  for (const card of run.deck) card.sockets = ['ember'];
+  assert.equal(R.canSocket(base, 'evo'), false);
+  assert.deepEqual(R.rollGemChoices(run), ['evo']);
+  assert.equal(R.claimGem(run, 'evo', base.uid, { meta, catalystUid: ordinary.uid }), false);
+  assert.equal(R.claimGem(run, 'evo', base.uid, { meta, catalystUid: catalyst.uid }), true);
+  assert.equal(base.id, 'champion');
+  assert.deepEqual(base.sockets, ['ember']);
+  assert.equal(meta.recipes.champion, true);
+  assert.ok(!run.deck.includes(catalyst));
   assert.equal(run.gold, 60);
-  run.node = { type: 'forge', done: false, gemChoices: ['thrift'] };
   assert.equal(R.claimGem(run, 'thrift', ordinary.uid), false);
 });
 
-test('events, elite rewards and migration leave no loose gem inventory', () => {
+test('the shop charges for an Evo Gem only when the selected pair evolves', () => {
+  const run = newRun();
+  run.gold = 100;
+  const shop = { items: [{ kind: 'gem', id: 'evo', price: 90, sold: false }] };
+  const meta = defaultMeta();
+  const { base, catalyst, recipe } = R.evoOptions(run)[0];
+  assert.equal(R.buy(run, shop, 0, base.uid), false);
+  assert.equal(R.buy(run, shop, 0, base.uid, { meta, catalystUid: catalyst.uid }), true);
+  assert.equal(run.gold, 10);
+  assert.equal(shop.items[0].sold, true);
+  assert.equal(base.id, recipe.result);
+  assert.deepEqual(base.sockets, [null]);
+  assert.equal(R.buy(run, shop, 0, base.uid, { meta, catalystUid: catalyst.uid }), false);
+});
+
+test('migration refunds reserved Evo Gems and replaces retired nodes without losing progress', () => {
   const run = newRun();
   run.v = 1;
   run.gems = ['ember', 'evo'];
   run.deck[0].sockets[0] = 'spark';
+  run.deck[1].sockets = ['evo', 'ember'];
+  const [[battle], [event]] = run.map.rows;
+  battle.type = 'elite';
+  battle.enc = { kind: 'elite', opponent: 'elite_ram' };
+  event.type = 'event';
+  run.pos = event.id;
+  run.visited = [battle.id, event.id];
+  run.node = { id: event.id, type: 'event', done: false, result: 'Relic gained' };
+  const next = R.availableNodes(run);
   R.migrateRun(run);
-  assert.equal(run.gold, 195);
+  assert.equal(run.gold, 285);
   assert.equal(run.deck[0].sockets[0], 'spark');
+  assert.deepEqual(run.deck[1].sockets, [null, 'ember']);
   assert.ok(!('gems' in run));
+  assert.equal(battle.enc.kind, 'battle');
+  assert.ok(OPPONENTS[battle.enc.opponent]);
+  assert.ok(R.NODE_INFO[event.type]);
+  assert.equal(run.node.type, event.type);
+  assert.equal(run.node.done, true);
+  assert.deepEqual(R.availableNodes(run), next);
   R.migrateRun(run);
-  assert.equal(run.gold, 195);
-  const sockets = run.deck.flatMap((card) => card.sockets).filter(Boolean);
-  const result = R.applyBattle(run, defaultMeta(), { enc: { kind: 'elite' } }, { won: true, lanesWon: 2, gold: 10 });
-  assert.ok(!('gem' in result));
-  for (const event of EVENTS) {
-    const copy = structuredClone(run);
-    for (const choice of event.choices) if (!choice.can || choice.can(copy)) choice.apply(R.eventApi(copy));
-    assert.ok(!('gems' in copy));
-    assert.deepEqual(copy.deck.flatMap((card) => card.sockets).filter(Boolean).filter((g) => !sockets.includes(g)), []);
-  }
+  assert.equal(run.gold, 285);
 });
 
-test('fusion preserves installed gems and cannot create a loose reward', () => {
-  const run = newRun();
-  const a = R.makeInst(run, 'recruit', { sockets: ['ember', 'spark'] });
-  const b = R.makeInst(run, 'recruit', { sockets: ['thrift', 'gilded'] });
+test('new cards start with one socket and fusion preserves capacity and gems', () => {
+  const run = R.newRun(defaultMeta(), 'forgemaster', 0, 917);
+  assert.ok(run.deck.every((card) => card.sockets.length === 1));
+  assert.ok(CARD_LIST.every((card) => R.makeInst(run, card.id).sockets.length === 1));
+  const a = R.makeInst(run, 'recruit', { sockets: ['ember'] });
+  const b = R.makeInst(run, 'recruit', { sockets: ['thrift'] });
   run.deck = [a, b];
   assert.deepEqual(R.fuseOptions(run), []);
   assert.equal(R.fuse(run, a.uid, b.uid), null);
-  b.sockets.pop();
+  a.sockets[0] = null;
   assert.ok(R.fuse(run, a.uid, b.uid));
-  assert.deepEqual(run.deck[0].sockets, ['ember', 'spark', 'thrift']);
-  assert.ok(!('gems' in run));
+  assert.deepEqual(run.deck[0].sockets, ['thrift']);
+});
+
+test('Campfire restores the current heart maximum once per visit', () => {
+  const run = newRun();
+  run.hearts = 1;
+  run.maxHearts = 4;
+  run.node = { type: 'camp', done: false };
+  const deck = structuredClone(run.deck);
+  R.restAtCamp(run);
+  assert.equal(run.hearts, 4);
+  assert.equal(run.node.heartsRestored, 3);
+  R.restAtCamp(run);
+  assert.equal(run.node.heartsRestored, 3);
+  assert.deepEqual(run.deck, deck);
 });
